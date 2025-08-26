@@ -1,4 +1,4 @@
-import { Tabs, useRouter } from 'expo-router';
+import { Redirect, Tabs, useRouter } from 'expo-router';
 import React from 'react';
 import {
 	Platform,
@@ -6,12 +6,15 @@ import {
 	StyleSheet,
 	TouchableOpacity,
 	View,
+	Text,
 } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
+import { useReactiveClient } from '@dynamic-labs/react-hooks';
+import { dynamicClient } from '@/lib/client';
 
 const styles = StyleSheet.create({
 	paymentButton: {
@@ -56,6 +59,14 @@ export const PaymentTabButton = () => {
 };
 
 export default function TabLayout() {
+	const { auth, sdk, wallets } = useReactiveClient(dynamicClient);
+
+	if (!sdk.loaded) {
+		return <Text>Loading...</Text>;
+	}
+
+	console.log(wallets.userWallets);
+
 	return (
 		<View style={{ flex: 1 }}>
 			<Tabs

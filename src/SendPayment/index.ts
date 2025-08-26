@@ -1,1 +1,0 @@
-export { SendPayment } from './SendPayment';

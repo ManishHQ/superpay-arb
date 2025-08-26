@@ -1,27 +1,55 @@
-import {
-	View,
-	Text,
-	ScrollView,
-	TouchableOpacity,
-	ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useReactiveClient } from '@dynamic-labs/react-hooks';
+import {
+	WalletCard,
+	QuickStats,
+	QuickActions,
+	RecentActivity,
+	XPProgress,
+	HomeHeader,
+} from '@/components';
+import { dynamicClient, publicClient } from '@/lib/client';
+import { Wallet } from '@dynamic-labs/client';
 
-// Mock data for display purposes
-const mockUser = {
-	firstName: 'John',
-	lastName: 'Doe',
+// Default data fallbacks
+const defaultUser = {
+	firstName: 'Guest',
+	lastName: 'User',
 };
 
-const mockBalances = {
-	usdcBalance: '1,234.56',
-	ethBalance: '0.5432',
-	walletAddress: '0x1234...5678',
+const defaultBalances = {
+	usdcBalance: '0.00',
+	ethBalance: '0.0000',
+	walletAddress: 'Not connected',
 };
+
+// Dynamic wallet configurations
+const walletConfigs = [
+	{
+		id: 'default',
+		name: 'Default Wallet',
+		gradientColors: ['#3D5AFE', '#00C896'],
+		showEthBalance: true,
+		showWalletAddress: true,
+	},
+	{
+		id: 'minimal',
+		name: 'Minimal View',
+		gradientColors: ['#667eea', '#764ba2'],
+		showEthBalance: false,
+		showWalletAddress: false,
+	},
+	{
+		id: 'premium',
+		name: 'Premium Wallet',
+		gradientColors: ['#f093fb', '#f5576c'],
+		showEthBalance: true,
+		showWalletAddress: true,
+	},
+];
 
 const mockWeeklyStats = {
 	sent: 245.5,
@@ -35,7 +63,7 @@ const mockRecentActivity = [
 		name: 'Sarah Wilson',
 		avatar: 'https://i.pravatar.cc/150?img=1',
 		amount: 25.5,
-		type: 'sent',
+		type: 'sent' as const,
 		note: 'Coffee ☕',
 		time: '2 hours ago',
 	},
@@ -44,7 +72,7 @@ const mockRecentActivity = [
 		name: 'Mike Chen',
 		avatar: 'https://i.pravatar.cc/150?img=2',
 		amount: 45.0,
-		type: 'received',
+		type: 'received' as const,
 		note: 'Lunch 🍕',
 		time: '4 hours ago',
 	},
@@ -53,31 +81,231 @@ const mockRecentActivity = [
 		name: 'Emma Davis',
 		avatar: 'https://i.pravatar.cc/150?img=3',
 		amount: 12.75,
-		type: 'sent',
+		type: 'sent' as const,
 		note: 'Uber ride 🚕',
 		time: '1 day ago',
 	},
 ];
 
+// Quick actions configuration
+const quickActions = [
+	{
+		id: 'send',
+		title: 'Send',
+		icon: 'arrow-up' as keyof typeof Ionicons.glyphMap,
+		iconColor: 'white',
+		bgColor: 'bg-blue-600',
+		onPress: () => console.log('Send button pressed - move logic to services'),
+	},
+	{
+		id: 'request',
+		title: 'Request',
+		icon: 'arrow-down' as keyof typeof Ionicons.glyphMap,
+		iconColor: 'white',
+		bgColor: 'bg-green-600',
+		onPress: () =>
+			console.log('Request button pressed - move logic to services'),
+	},
+	{
+		id: 'split',
+		title: 'Split',
+		icon: 'people' as keyof typeof Ionicons.glyphMap,
+		iconColor: '#3D5AFE',
+		bgColor: 'bg-gray-200',
+		onPress: () => console.log('Split button pressed - move logic to services'),
+	},
+];
+
 export default function HomeScreen() {
+	const { auth, sdk, wallets } = useReactiveClient(dynamicClient);
 	const [isLoading, setIsLoading] = useState(false);
+	const [currentTime, setCurrentTime] = useState(new Date());
+	const [greeting, setGreeting] = useState('');
+	const [currentWalletConfig, setCurrentWalletConfig] = useState(
+		walletConfigs[0]
+	);
+	const [dynamicStats, setDynamicStats] = useState(mockWeeklyStats);
+	const [userData, setUserData] = useState(defaultUser);
+	const [walletData, setWalletData] = useState(defaultBalances);
+	const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
+	const [isWalletLoading, setIsWalletLoading] = useState(false);
 
-	const handleSend = () => {
-		console.log('Send button pressed - move logic to services');
+	// Update greeting based on time of day
+	useEffect(() => {
+		const updateGreeting = () => {
+			const hour = new Date().getHours();
+			if (hour < 12) {
+				setGreeting('Good morning');
+			} else if (hour < 17) {
+				setGreeting('Good afternoon');
+			} else {
+				setGreeting('Good evening');
+			}
+		};
+
+		updateGreeting();
+		const interval = setInterval(updateGreeting, 60000); // Update every minute
+
+		return () => clearInterval(interval);
+	}, []);
+
+	// Fetch real wallet data from Dynamic
+	useEffect(() => {
+		const fetchWalletData = async () => {
+			try {
+				if (auth.token && wallets.userWallets.length > 0) {
+					const connectedWallet = wallets.userWallets[0];
+					console.log('Connected wallet:', connectedWallet);
+
+					// Get wallet address
+					const address = connectedWallet.address;
+
+					// Try to get balances using Viem extension
+					if (publicClient) {
+						try {
+							// Get ETH balance
+							const ethBalance = await publicClient.getBalance({
+								address: address as `0x${string}`,
+							});
+							console.log('ETH balance:', ethBalance);
+							const ethBalanceFormatted = (Number(ethBalance) / 1e18).toFixed(
+								4
+							);
+
+							// For USDC, you'd typically check a specific token contract
+							// This is a simplified example
+							const usdcBalance = '0.00'; // You can implement USDC balance checking here
+
+							setWalletData({
+								usdcBalance,
+								ethBalance: ethBalanceFormatted,
+								walletAddress: `${address.slice(0, 6)}...${address.slice(-4)}`,
+							});
+						} catch (error) {
+							console.error('Error fetching wallet balances:', error);
+							setWalletData({
+								...defaultBalances,
+								walletAddress: `${address.slice(0, 6)}...${address.slice(-4)}`,
+							});
+						}
+					}
+				} else {
+					setWalletData(defaultBalances);
+				}
+			} catch (error) {
+				console.error('Error in fetchWalletData:', error);
+				setWalletData(defaultBalances);
+			}
+		};
+
+		fetchWalletData();
+
+		// Refresh wallet data every 30 seconds
+		const walletInterval = setInterval(fetchWalletData, 30000);
+
+		return () => clearInterval(walletInterval);
+	}, [auth.token, wallets.userWallets, publicClient]);
+
+	// Update user data from Dynamic auth
+	useEffect(() => {
+		if (auth.authenticatedUser) {
+			const user = auth.authenticatedUser;
+			setUserData({
+				firstName: user.firstName || user.username || 'User',
+				lastName: user.lastName || '',
+			});
+		} else {
+			setUserData(defaultUser);
+		}
+	}, [auth.authenticatedUser]);
+
+	// Simulate real-time stats updates
+	useEffect(() => {
+		const updateStats = () => {
+			setDynamicStats((prev) => ({
+				...prev,
+				sent: prev.sent + Math.random() * 10,
+				received: prev.received + Math.random() * 5,
+				transactions: prev.transactions + Math.floor(Math.random() * 2),
+			}));
+		};
+
+		const statsInterval = setInterval(updateStats, 30000); // Update every 30 seconds
+
+		return () => clearInterval(statsInterval);
+	}, []);
+
+	const handleSend = async () => {
+		if (!connectedWallet) {
+			console.log('No wallet connected');
+			// Show connection prompt
+			dynamicClient.ui.auth.show();
+			return;
+		}
+
+		console.log('Send button pressed with wallet:', connectedWallet.address);
+
+		try {
+			// For now, just log the action
+			// In a real implementation, you would open a send modal
+			console.log('Opening send payment modal...');
+
+			// You can implement a send modal here or navigate to a send screen
+			// For example: router.push('/send-payment');
+		} catch (error) {
+			console.error('Error in handleSend:', error);
+		}
 	};
 
-	const handleRequest = () => {
-		console.log('Request button pressed - move logic to services');
-	};
-
-	const handleSplit = () => {
-		console.log('Split button pressed - move logic to services');
-	};
-
-	const handleRefresh = () => {
-		console.log('Refresh button pressed - move logic to services');
+	const handleRefresh = async () => {
+		console.log('Refresh button pressed - refreshing wallet data');
 		setIsLoading(true);
-		setTimeout(() => setIsLoading(false), 1000);
+
+		try {
+			// Trigger wallet data refresh
+			if (connectedWallet && publicClient) {
+				const ethBalance = await publicClient.getBalance({
+					address: connectedWallet.address as `0x${string}`,
+				});
+				const ethBalanceFormatted = (Number(ethBalance) / 1e18).toFixed(4);
+
+				setWalletData((prev) => ({
+					...prev,
+					ethBalance: ethBalanceFormatted,
+				}));
+
+				console.log('Balance refreshed:', ethBalanceFormatted);
+			}
+		} catch (error) {
+			console.error('Error refreshing balance:', error);
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	const handleViewAllActivity = () => {
+		console.log('View all activity pressed - move logic to services');
+	};
+
+	const cycleWalletConfig = () => {
+		const currentIndex = walletConfigs.findIndex(
+			(config) => config.id === currentWalletConfig.id
+		);
+		const nextIndex = (currentIndex + 1) % walletConfigs.length;
+		setCurrentWalletConfig(walletConfigs[nextIndex]);
+		console.log('Switched to wallet config:', walletConfigs[nextIndex].name);
+	};
+
+	const handleConnectWallet = () => {
+		console.log('Opening Dynamic wallet connection...');
+		// This will open the Dynamic wallet connection modal
+		dynamicClient.ui.auth.show();
+	};
+
+	const handleDisconnect = () => {
+		console.log('Disconnecting wallet...');
+		// This will disconnect the current wallet
+		dynamicClient.auth.logout();
 	};
 
 	return (
@@ -88,247 +316,115 @@ export default function HomeScreen() {
 				contentContainerStyle={{ paddingBottom: 16 }}
 			>
 				{/* Header */}
-				<View className='mb-6'>
-					<View className='flex-row items-center justify-between mb-2'>
-						<View>
-							<Text className='text-2xl font-bold text-gray-900'>
-								Welcome back, {mockUser.firstName}!
-							</Text>
-							<Text className='text-base text-gray-600'>
-								Here is your summary for the week.
-							</Text>
+				<HomeHeader
+					firstName={userData.firstName}
+					subtitle={`${greeting}! Here is your summary for the week.`}
+					onNotificationPress={() => console.log('Notifications pressed')}
+				/>
+
+				{/* Connection Status */}
+				{!auth.token && (
+					<View className='p-4 mb-4 border border-yellow-200 bg-yellow-50 rounded-xl'>
+						<View className='flex-row items-center justify-between'>
+							<View className='flex-1'>
+								<Text className='text-sm font-medium text-yellow-800'>
+									Wallet Not Connected
+								</Text>
+								<Text className='mt-1 text-xs text-yellow-600'>
+									Connect your wallet to view real-time balances and
+									transactions
+								</Text>
+							</View>
+							<TouchableOpacity
+								className='px-4 py-2 bg-yellow-600 rounded-lg'
+								onPress={handleConnectWallet}
+							>
+								<Text className='text-sm font-medium text-white'>
+									Connect Wallet
+								</Text>
+							</TouchableOpacity>
 						</View>
-						<TouchableOpacity className='items-center justify-center w-12 h-12 bg-white rounded-full shadow-sm'>
-							<Ionicons name='notifications' size={24} color='#3D5AFE' />
-						</TouchableOpacity>
 					</View>
-				</View>
+				)}
 
 				{/* Balance Card */}
-				<LinearGradient
-					colors={['#3D5AFE', '#00C896']}
-					start={{ x: 0, y: 0 }}
-					end={{ x: 1, y: 0 }}
-					className='mb-6'
-					style={{ borderRadius: 20, padding: 24 }}
-				>
-					<Text
-						style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-						className='mb-3 text-base font-medium'
-					>
-						Wallet Balance
-					</Text>
-					<View className='flex-row items-center justify-between mb-4'>
-						<View className='flex-1'>
-							<View className='flex-row items-center mb-2'>
-								<Text className='text-2xl font-bold text-white'>
-									{mockBalances.usdcBalance}
-								</Text>
-								<Text
-									style={{ color: 'rgba(255, 255, 255, 0.8)' }}
-									className='ml-2 text-lg'
-								>
-									USDC
-								</Text>
-							</View>
-							<View className='flex-row items-center'>
-								<Text className='text-lg font-semibold text-white'>
-									{mockBalances.ethBalance}
-								</Text>
-								<Text
-									style={{ color: 'rgba(255, 255, 255, 0.8)' }}
-									className='ml-2 text-sm'
-								>
-									ETH
-								</Text>
-							</View>
+				<View className='mb-6'>
+					<View className='flex-row items-center justify-between mb-2'>
+						<Text className='text-sm text-gray-500'>
+							Tap to change wallet style
+						</Text>
+						<View className='flex-row items-center gap-2'>
+							<View
+								className={`w-2 h-2 rounded-full ${auth.token ? 'bg-green-500' : 'bg-red-500'}`}
+							/>
+							<Text className='text-xs text-gray-400'>
+								{auth.token ? 'Connected' : 'Not Connected'}
+							</Text>
+							<Text className='text-xs text-gray-400'>
+								• {currentWalletConfig.name}
+							</Text>
+							{isWalletLoading && (
+								<View className='w-2 h-2 bg-blue-500 rounded-full animate-pulse' />
+							)}
 						</View>
+					</View>
+					<TouchableOpacity onPress={cycleWalletConfig} activeOpacity={0.8}>
+						<WalletCard
+							usdcBalance={walletData.usdcBalance}
+							ethBalance={walletData.ethBalance}
+							walletAddress={walletData.walletAddress}
+							onSendPress={handleSend}
+							gradientColors={currentWalletConfig.gradientColors}
+							showEthBalance={currentWalletConfig.showEthBalance}
+							showWalletAddress={currentWalletConfig.showWalletAddress}
+						/>
+					</TouchableOpacity>
+				</View>
+
+				{/* Disconnect Button */}
+				{auth.token && (
+					<View className='flex-row justify-end mb-6'>
 						<TouchableOpacity
-							className='px-4 py-2 bg-white rounded-full'
-							onPress={handleSend}
+							className='px-4 py-2 bg-red-100 border border-red-300 rounded-lg'
+							onPress={handleDisconnect}
 						>
-							<View className='flex-row items-center'>
-								<Ionicons name='send' size={16} color='#3D5AFE' />
-								<Text className='ml-1 text-sm font-medium text-blue-600'>
-									Send
-								</Text>
-							</View>
+							<Text className='text-sm font-medium text-red-700'>
+								Disconnect Wallet
+							</Text>
 						</TouchableOpacity>
 					</View>
-					<View className='flex-row items-center'>
-						<Ionicons name='wallet' size={18} color='white' />
-						<Text
-							style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-							className='ml-2 text-sm'
-						>
-							{mockBalances.walletAddress}
-						</Text>
-					</View>
-				</LinearGradient>
+				)}
 
 				{/* Quick Stats */}
-				<View className='my-6'>
-					<View className='flex-row items-center justify-between mb-3'>
-						<Text className='text-xl font-semibold text-gray-900'>
-							This Week
-						</Text>
-						<TouchableOpacity onPress={handleRefresh}>
-							<Ionicons
-								name='refresh'
-								size={20}
-								color='#3D5AFE'
-								style={{ opacity: isLoading ? 0.5 : 1 }}
-							/>
-						</TouchableOpacity>
-					</View>
-					<View className='p-6 bg-white shadow-sm rounded-2xl'>
-						<View className='flex-row justify-between'>
-							<View className='items-center'>
-								<Text className='text-2xl font-bold text-blue-600'>
-									${mockWeeklyStats.sent.toFixed(2)}
-								</Text>
-								<Text className='text-sm text-gray-500'>Sent</Text>
-							</View>
-							<View className='items-center'>
-								<Text className='text-2xl font-bold text-green-600'>
-									${mockWeeklyStats.received.toFixed(2)}
-								</Text>
-								<Text className='text-sm text-gray-500'>Received</Text>
-							</View>
-							<View className='items-center'>
-								<Text className='text-2xl font-bold text-blue-600'>
-									{mockWeeklyStats.transactions}
-								</Text>
-								<Text className='text-sm text-gray-500'>Transactions</Text>
-							</View>
-						</View>
-					</View>
-				</View>
+				<QuickStats
+					sent={dynamicStats.sent}
+					received={dynamicStats.received}
+					transactions={dynamicStats.transactions}
+					onRefresh={handleRefresh}
+					isLoading={isLoading}
+				/>
 
 				{/* Quick Actions */}
-				<View className='mb-6'>
-					<Text className='mb-3 text-xl font-semibold text-gray-900'>
-						Quick Actions
-					</Text>
-					<View className='flex-row justify-between space-x-4 bg-white rounded-2xl'>
-						<TouchableOpacity
-							className='items-center flex-1 py-6 shadow-sm rounded-2xl'
-							onPress={handleSend}
-						>
-							<View className='items-center justify-center w-12 h-12 mb-3 rounded-full bg-blue-600'>
-								<Ionicons name='arrow-up' size={24} color='white' />
-							</View>
-							<Text className='text-base font-medium text-gray-900'>Send</Text>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							className='items-center flex-1 py-6 shadow-sm rounded-2xl'
-							onPress={handleRequest}
-						>
-							<View className='items-center justify-center w-12 h-12 mb-3 rounded-full bg-green-600'>
-								<Ionicons name='arrow-down' size={24} color='white' />
-							</View>
-							<Text className='text-base font-medium text-gray-900'>
-								Request
-							</Text>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							className='items-center flex-1 py-6 shadow-sm rounded-2xl'
-							onPress={handleSplit}
-						>
-							<View className='items-center justify-center w-12 h-12 mb-3 bg-gray-200 rounded-full'>
-								<Ionicons name='people' size={24} color='#3D5AFE' />
-							</View>
-							<Text className='text-base font-medium text-gray-900'>Split</Text>
-						</TouchableOpacity>
-					</View>
-				</View>
+				<QuickActions actions={quickActions} title='Quick Actions' />
 
 				{/* Recent Activity */}
-				<View className='p-6 mb-6 bg-white shadow-sm rounded-2xl'>
-					<View className='flex-row items-center justify-between mb-6'>
-						<Text className='text-xl font-semibold text-gray-900'>
-							Recent Activity
-						</Text>
-						<TouchableOpacity>
-							<Text className='text-base font-medium text-blue-600'>
-								View All
-							</Text>
-						</TouchableOpacity>
-					</View>
-
-					{mockRecentActivity.map((activity) => (
-						<View
-							key={activity.id}
-							className='flex-row items-center justify-between py-4 border-b border-gray-100 last:border-b-0'
-						>
-							<View className='flex-row items-center flex-1'>
-								<Image
-									source={{ uri: activity.avatar }}
-									style={{
-										width: 48,
-										height: 48,
-										marginRight: 16,
-										borderRadius: 24,
-									}}
-									contentFit='cover'
-									placeholder='👤'
-									transition={200}
-								/>
-								<View className='flex-1'>
-									<Text className='text-base font-medium text-gray-900'>
-										{activity.name}
-									</Text>
-									<Text className='text-sm text-gray-500'>
-										{activity.note} • {activity.time}
-									</Text>
-								</View>
-							</View>
-							<View className='items-end'>
-								<Text
-									className={`font-semibold text-xl ${
-										activity.type === 'sent' ? 'text-red-500' : 'text-green-600'
-									}`}
-								>
-									{activity.type === 'sent' ? '-' : '+'}${activity.amount}
-								</Text>
-								<Text className='text-sm text-gray-600 capitalize'>
-									{activity.type}
-								</Text>
-							</View>
-						</View>
-					))}
-				</View>
+				<RecentActivity
+					activities={mockRecentActivity}
+					onViewAll={handleViewAllActivity}
+				/>
 
 				{/* XP Progress */}
-				<LinearGradient
-					colors={['#3D5AFE', '#00C896']}
-					start={{ x: 0, y: 0 }}
-					end={{ x: 1, y: 0 }}
-					className='mb-6'
-					style={{ borderRadius: 20, padding: 32, marginBottom: 100 }}
-				>
-					<View className='flex-row items-center justify-between mb-4'>
-						<Text className='text-xl font-semibold text-white'>Level 8</Text>
-						<Text className='text-base text-white'>1,247 XP</Text>
-					</View>
-					<View
-						className='h-3 mb-3 bg-white rounded-full'
-						style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-					>
-						<View
-							className='h-3 bg-white rounded-full'
-							style={{ width: '75%' }}
-						/>
-					</View>
-					<Text className='text-base text-white'>247 XP to next level</Text>
-				</LinearGradient>
+				<XPProgress
+					level={8}
+					currentXP={1247}
+					nextLevelXP={1500}
+					progressPercentage={75}
+				/>
 			</ScrollView>
 
 			{/* Floating Action Button */}
 			<TouchableOpacity
-				className='absolute items-center justify-center w-16 h-16 rounded-full shadow-lg bottom-8 right-6 bg-blue-600'
+				className='absolute items-center justify-center w-16 h-16 bg-blue-600 rounded-full shadow-lg bottom-8 right-6'
 				onPress={handleSend}
 			>
 				<Ionicons name='add' size={36} color='white' />

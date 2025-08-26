@@ -1,34 +1,198 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { router } from 'expo-router';
+import { dynamicClient } from '@/lib/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginPage() {
 	const [usedOneTimePasswordMethod, setUsedOneTimePasswordMethod] = useState<
 		'email' | 'sms' | null
 	>(null);
+	const [email, setEmail] = useState('');
+	const [phone, setPhone] = useState('');
+	const [otpToken, setOtpToken] = useState('');
+	const [isAuthenticated, setIsAuthenticated] = useState(false);
+	const [isLoading, setIsLoading] = useState(false);
+	const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+	// Check for existing authentication token on mount
+	useEffect(() => {
+		checkExistingAuth();
+	}, []);
+
+	// Navigate to home when authentication state changes
+	useEffect(() => {
+		if (isAuthenticated && !isCheckingAuth) {
+			console.log('User authenticated, navigating to home');
+			router.replace('/(tabs)/home');
+		}
+	}, [isAuthenticated, isCheckingAuth]);
+
+	const checkExistingAuth = async () => {
+		try {
+			const token = await AsyncStorage.getItem('authToken');
+			if (token) {
+				console.log('Found existing auth token');
+				setIsAuthenticated(true);
+			}
+		} catch (error) {
+			console.error('Error checking existing auth:', error);
+		} finally {
+			setIsCheckingAuth(false);
+		}
+	};
+
+	const storeAuthToken = async (token: string) => {
+		try {
+			await AsyncStorage.setItem('authToken', token);
+			console.log('Auth token stored successfully');
+			setIsAuthenticated(true);
+		} catch (error) {
+			console.error('Error storing auth token:', error);
+		}
+	};
+
+	const clearAuthToken = async () => {
+		try {
+			await AsyncStorage.removeItem('authToken');
+			console.log('Auth token cleared');
+			setIsAuthenticated(false);
+		} catch (error) {
+			console.error('Error clearing auth token:', error);
+		}
+	};
 
 	const handleEmailLogin = (email: string) => {
-		// Move authentication logic to services
-		console.log('Email login:', email);
-		setUsedOneTimePasswordMethod('email');
+		if (!email.trim()) {
+			Alert.alert('Error', 'Please enter a valid email address');
+			return;
+		}
+
+		setIsLoading(true);
+		console.log('Attempting to send email OTP to:', email);
+
+		try {
+			dynamicClient.auth.email
+				.sendOTP(email)
+				.then(() => {
+					console.log('Email OTP sent successfully');
+					setUsedOneTimePasswordMethod('email');
+					setIsLoading(false);
+					Alert.alert('Success', 'OTP sent to your email');
+				})
+				.catch((error: any) => {
+					console.error('Email OTP error:', error);
+					setIsLoading(false);
+					Alert.alert(
+						'Error',
+						`Failed to send OTP: ${error?.message || 'Unknown error'}`
+					);
+				});
+		} catch (error: any) {
+			console.error('Exception in handleEmailLogin:', error);
+			setIsLoading(false);
+			Alert.alert(
+				'Error',
+				`Exception occurred: ${error?.message || 'Unknown error'}`
+			);
+		}
 	};
 
 	const handleSMSLogin = (phone: string) => {
-		// Move authentication logic to services
-		console.log('SMS login:', phone);
-		setUsedOneTimePasswordMethod('sms');
+		if (!phone.trim()) {
+			Alert.alert('Error', 'Please enter a valid phone number');
+			return;
+		}
+
+		setIsLoading(true);
+		console.log('Attempting to send SMS OTP to:', phone);
+
+		try {
+			dynamicClient.auth.sms
+				.sendOTP({ dialCode: '1', iso2: 'us', phone })
+				.then(() => {
+					console.log('SMS OTP sent successfully');
+					setUsedOneTimePasswordMethod('sms');
+					setIsLoading(false);
+					Alert.alert('Success', 'OTP sent to your phone');
+				})
+				.catch((error: any) => {
+					console.error('SMS OTP error:', error);
+					setIsLoading(false);
+					Alert.alert(
+						'Error',
+						`Failed to send OTP: ${error?.message || 'Unknown error'}`
+					);
+				});
+		} catch (error: any) {
+			console.error('Exception in handleSMSLogin:', error);
+			setIsLoading(false);
+			Alert.alert(
+				'Error',
+				`Exception occurred: ${error?.message || 'Unknown error'}`
+			);
+		}
 	};
 
 	const handleOTPVerification = (token: string) => {
-		// Move verification logic to services
-		console.log('OTP verification:', token);
-		router.push('/(tabs)/home');
-	};
+		if (!token.trim()) {
+			Alert.alert('Error', 'Please enter the OTP token');
+			return;
+		}
 
-	const handleSocialLogin = (provider: string) => {
-		// Move social auth logic to services
-		console.log('Social login:', provider);
-		router.push('/(tabs)/home');
+		setIsLoading(true);
+
+		if (usedOneTimePasswordMethod === 'email') {
+			dynamicClient.auth.email
+				.verifyOTP(token)
+				.then((response: any) => {
+					console.log('Email OTP verification successful:', response);
+					// Store the authentication token
+					if (response?.token) {
+						storeAuthToken(response.token);
+					} else {
+						// If no token in response, create a mock one for demo
+						storeAuthToken(`email_${Date.now()}`);
+					}
+					setIsLoading(false);
+					Alert.alert('Success', 'Email verified successfully!', [
+						{
+							text: 'Continue',
+							onPress: () => router.replace('/(tabs)/home'),
+						},
+					]);
+				})
+				.catch((error: any) => {
+					console.error('Email OTP verification error:', error);
+					setIsLoading(false);
+					Alert.alert('Error', 'Invalid OTP. Please try again.');
+				});
+		} else if (usedOneTimePasswordMethod === 'sms') {
+			dynamicClient.auth.sms
+				.verifyOTP(token)
+				.then((response: any) => {
+					console.log('SMS OTP verification successful:', response);
+					// Store the authentication token
+					if (response?.token) {
+						storeAuthToken(response.token);
+					} else {
+						// If no token in response, create a mock one for demo
+						storeAuthToken(`sms_${Date.now()}`);
+					}
+					setIsLoading(false);
+					Alert.alert('Success', 'Phone verified successfully!', [
+						{
+							text: 'Continue',
+							onPress: () => router.replace('/(tabs)/home'),
+						},
+					]);
+				})
+				.catch((error: any) => {
+					console.error('SMS OTP verification error:', error);
+					setIsLoading(false);
+					Alert.alert('Error', 'Invalid OTP. Please try again.');
+				});
+		}
 	};
 
 	const renderContent = () => {
@@ -36,37 +200,66 @@ export default function LoginPage() {
 			return (
 				<>
 					<View className='mb-8'>
-						<Text className='mb-4 text-lg font-semibold text-gray-700'>
-							Enter OTP Token
-						</Text>
-						<View className='flex-row items-center gap-3'>
+						<View className='mb-4'>
+							<Text className='text-lg font-semibold text-gray-700'>
+								Enter OTP Token
+							</Text>
+							<Text className='mt-1 text-sm text-gray-500'>
+								Enter the 6-digit code sent to your{' '}
+								{usedOneTimePasswordMethod === 'email' ? 'email' : 'phone'}
+							</Text>
+						</View>
+						<View className='flex-col gap-3'>
 							<TextInput
-								className='flex-1 px-4 py-3 text-lg bg-white border border-gray-300 rounded-lg'
-								placeholder='OTP token'
+								className='w-full px-4 py-3 text-lg bg-white border border-gray-300 rounded-lg'
+								placeholder={isLoading ? 'Verifying...' : 'OTP token'}
+								value={otpToken}
+								onChangeText={setOtpToken}
 								placeholderTextColor='#9CA3AF'
-								onSubmitEditing={(e) =>
-									handleOTPVerification(e.nativeEvent.text)
-								}
 								keyboardType='numeric'
 								returnKeyType='done'
+								editable={!isLoading}
 								style={{
 									textAlignVertical: 'center',
 									height: 48,
 									lineHeight: 20,
 								}}
 							/>
-							<TouchableOpacity
-								className='px-6 bg-red-500 rounded-xl'
-								style={{ height: 48 }}
-								onPress={() => setUsedOneTimePasswordMethod(null)}
-							>
-								<Text
-									className='font-semibold text-center text-white'
-									style={{ lineHeight: 48 }}
+							<View className='flex-row gap-3'>
+								<TouchableOpacity
+									className={`flex-1 px-6 py-3 rounded-xl ${
+										isLoading || !otpToken.trim()
+											? 'bg-gray-400'
+											: 'bg-blue-600'
+									}`}
+									style={{ height: 48 }}
+									onPress={() => handleOTPVerification(otpToken)}
+									disabled={isLoading || !otpToken.trim()}
 								>
-									Cancel
-								</Text>
-							</TouchableOpacity>
+									<Text
+										className='font-semibold text-center text-white'
+										style={{ lineHeight: 48 }}
+									>
+										{isLoading ? 'Verifying...' : 'Verify OTP'}
+									</Text>
+								</TouchableOpacity>
+								<TouchableOpacity
+									className='px-6 bg-red-500 rounded-xl'
+									style={{ height: 48 }}
+									onPress={() => {
+										setUsedOneTimePasswordMethod(null);
+										setOtpToken('');
+									}}
+									disabled={isLoading}
+								>
+									<Text
+										className='font-semibold text-center text-white'
+										style={{ lineHeight: 48 }}
+									>
+										Cancel
+									</Text>
+								</TouchableOpacity>
+							</View>
 						</View>
 					</View>
 				</>
@@ -82,11 +275,13 @@ export default function LoginPage() {
 					<View className='flex-row items-center gap-3'>
 						<TextInput
 							placeholder='Enter your email'
+							value={email}
+							onChangeText={setEmail}
 							className='flex-1 px-4 py-3 text-lg bg-white border border-gray-300 rounded-lg'
 							placeholderTextColor='#9CA3AF'
 							keyboardType='email-address'
 							returnKeyType='done'
-							onSubmitEditing={(e) => handleEmailLogin(e.nativeEvent.text)}
+							onSubmitEditing={() => handleEmailLogin(email)}
 							style={{
 								textAlignVertical: 'center',
 								height: 48,
@@ -96,13 +291,14 @@ export default function LoginPage() {
 						<TouchableOpacity
 							className='px-6 bg-blue-600 rounded-xl'
 							style={{ height: 48 }}
-							onPress={() => handleEmailLogin('')}
+							onPress={() => handleEmailLogin(email)}
+							disabled={isLoading}
 						>
 							<Text
-								className='font-semibold text-white text-center'
+								className='font-semibold text-center text-white'
 								style={{ lineHeight: 48 }}
 							>
-								Send OTP
+								{isLoading ? 'Sending...' : 'Send OTP'}
 							</Text>
 						</TouchableOpacity>
 					</View>
@@ -116,10 +312,12 @@ export default function LoginPage() {
 						<TextInput
 							className='flex-1 px-4 py-3 text-lg bg-white border border-gray-300 rounded-lg'
 							placeholder='Enter your phone number'
+							value={phone}
+							onChangeText={setPhone}
 							placeholderTextColor='#9CA3AF'
 							keyboardType='phone-pad'
 							returnKeyType='done'
-							onSubmitEditing={(e) => handleSMSLogin(e.nativeEvent.text)}
+							onSubmitEditing={() => handleSMSLogin(phone)}
 							style={{
 								textAlignVertical: 'center',
 								height: 48,
@@ -129,49 +327,49 @@ export default function LoginPage() {
 						<TouchableOpacity
 							className='px-6 bg-blue-600 rounded-xl'
 							style={{ height: 48 }}
-							onPress={() => handleSMSLogin('')}
+							onPress={() => handleSMSLogin(phone)}
+							disabled={isLoading}
 						>
 							<Text
-								className='font-semibold text-white text-center'
+								className='font-semibold text-center text-white'
 								style={{ lineHeight: 48 }}
 							>
-								Send OTP
+								{isLoading ? 'Sending...' : 'Send OTP'}
 							</Text>
 						</TouchableOpacity>
 					</View>
 				</View>
-
-				<View className='mb-8'>
-					<TouchableOpacity
-						className='w-full py-4 mb-4 bg-purple-600 rounded-xl'
-						onPress={() => handleSocialLogin('farcaster')}
-					>
-						<Text className='text-lg font-semibold text-center text-white'>
-							Connect with Farcaster
-						</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						className='w-full py-4 mb-4 bg-red-500 rounded-xl'
-						onPress={() => handleSocialLogin('google')}
-					>
-						<Text className='text-lg font-semibold text-center text-white'>
-							Connect with Google
-						</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						className='w-full py-4 bg-gray-600 rounded-xl'
-						onPress={() => console.log('Open Auth Flow UI')}
-					>
-						<Text className='text-lg font-semibold text-center text-white'>
-							Open Auth Flow UI
-						</Text>
-					</TouchableOpacity>
-				</View>
 			</>
 		);
 	};
+
+	// Show loading screen while checking authentication
+	if (isCheckingAuth) {
+		return (
+			<View className='items-center justify-center flex-1 bg-gray-50'>
+				<View className='items-center'>
+					<Text className='mb-4 text-2xl font-bold text-gray-800'>
+						SuperPay
+					</Text>
+					<Text className='text-gray-600'>Checking authentication...</Text>
+				</View>
+			</View>
+		);
+	}
+
+	// If already authenticated, don't show login form
+	if (isAuthenticated) {
+		return (
+			<View className='items-center justify-center flex-1 bg-gray-50'>
+				<View className='items-center'>
+					<Text className='mb-4 text-2xl font-bold text-gray-800'>
+						SuperPay
+					</Text>
+					<Text className='text-gray-600'>Redirecting to home...</Text>
+				</View>
+			</View>
+		);
+	}
 
 	return (
 		<View className='justify-center flex-1 p-5 bg-gray-50'>

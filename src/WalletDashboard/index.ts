@@ -1,1 +1,0 @@
-export { WalletDashboard } from './WalletDashboard';
