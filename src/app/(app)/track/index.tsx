@@ -300,18 +300,7 @@ export default function TrackScreen() {
 				</View>
 
 				{/* Net Cash Flow */}
-				<LinearGradient
-					colors={['#EFF6FF', '#F3E8FF']}
-					start={{ x: 0, y: 0 }}
-					end={{ x: 1, y: 0 }}
-					style={{
-						borderRadius: 12,
-						padding: 24,
-						marginBottom: 24,
-						borderWidth: 1,
-						borderColor: '#DBEAFE',
-					}}
-				>
+				<View className='p-4 mb-6 bg-white rounded-xl'>
 					<View className='flex-row items-center justify-between'>
 						<View>
 							<Text className='text-lg font-semibold text-gray-900'>
@@ -336,7 +325,7 @@ export default function TrackScreen() {
 							/>
 						</View>
 					</View>
-				</LinearGradient>
+				</View>
 
 				{/* Financial Trend Chart */}
 				<View className='p-4 mb-6 bg-white rounded-xl'>

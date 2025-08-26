@@ -17,8 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import QRCode from 'react-native-qrcode-svg';
 import { useUserProfileStore } from '@/stores/userProfileStore';
-import { PaymentRequestsList } from '@/components/PaymentRequestsList';
-import { PaymentRequestModal } from '@/components/PaymentRequestModal';
+// Removed payment requests imports for security
 
 const styles = StyleSheet.create({
 	container: {

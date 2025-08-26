@@ -160,6 +160,11 @@ export default function BusinessLayout() {
 		username: currentProfile?.username || 'business',
 	});
 
+	// Add cache-busting for avatar updates
+	const cacheBustedAvatarUrl = currentProfile?.avatar_url
+		? `${avatarUrl}?v=${currentProfile?.updated_at || Date.now()}`
+		: avatarUrl;
+
 	const navigationItems = [
 		{
 			name: 'home/index',
@@ -206,7 +211,7 @@ export default function BusinessLayout() {
 					{/* Profile Section */}
 					<View style={styles.sidebarProfileSection}>
 						<Image
-							source={{ uri: avatarUrl }}
+							source={{ uri: cacheBustedAvatarUrl }}
 							style={styles.sidebarAvatar}
 							resizeMode='cover'
 						/>

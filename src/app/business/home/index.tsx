@@ -12,12 +12,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserProfileStore } from '@/stores/userProfileStore';
+import { useBalanceStore } from '@/stores/balanceStore';
+import { useReactiveClient } from '@dynamic-labs/react-hooks';
+import { dynamicClient } from '@/lib/client';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AvatarService } from '@/services/avatarService';
 import { Image } from 'react-native';
+import { WalletCard } from '@/components/WalletCard';
 import { QRPaymentRequestModal } from '@/components/QRPaymentRequestModal';
 import { PaymentRequestModal } from '@/components/PaymentRequestModal';
 import { QuickQRGenerator } from '@/components/QuickQRGenerator';
+import SendModal from '@/components/SendModal';
 import {
 	BusinessDashboardService,
 	BusinessStats,
@@ -193,11 +198,14 @@ const styles = StyleSheet.create({
 
 export default function BusinessDashboard() {
 	const { currentProfile, isLoading } = useUserProfileStore();
+	const { wallets } = useReactiveClient(dynamicClient);
+	const { fetchBalances, getBalance, isBalanceStale } = useBalanceStore();
 	const { width } = useWindowDimensions();
 	const isDesktop = width >= 768;
 	const [showQRPaymentModal, setShowQRPaymentModal] = useState(false);
 	const [showPaymentRequestModal, setShowPaymentRequestModal] = useState(false);
 	const [showQuickQRModal, setShowQuickQRModal] = useState(false);
+	const [showSendModal, setShowSendModal] = useState(false);
 
 	// Real data state
 	const [businessStats, setBusinessStats] = useState<BusinessStats | null>(
@@ -212,6 +220,18 @@ export default function BusinessDashboard() {
 			loadDashboardData();
 		}
 	}, [currentProfile]);
+
+	// Fetch wallet balances
+	useEffect(() => {
+		const primaryWallet = wallets.userWallets?.[0];
+		if (primaryWallet?.address) {
+			const address = primaryWallet.address;
+			// Check if balance is stale and fetch if needed
+			if (isBalanceStale(address)) {
+				fetchBalances(address);
+			}
+		}
+	}, [wallets.userWallets, fetchBalances, isBalanceStale]);
 
 	const loadDashboardData = async () => {
 		if (!currentProfile?.id) return;
@@ -236,6 +256,13 @@ export default function BusinessDashboard() {
 	const onRefresh = async () => {
 		setRefreshing(true);
 		await loadDashboardData();
+
+		// Also refresh wallet balances
+		const primaryWallet = wallets.userWallets?.[0];
+		if (primaryWallet?.address) {
+			await fetchBalances(primaryWallet.address, true); // Force refresh
+		}
+
 		setRefreshing(false);
 	};
 
@@ -297,6 +324,19 @@ export default function BusinessDashboard() {
 			username: currentProfile?.username || 'business',
 		});
 
+	// Get wallet balance data
+	const primaryWallet = wallets.userWallets?.[0];
+	const walletAddress = primaryWallet?.address || '';
+	const ethBalance = getBalance(walletAddress, 'eth');
+	const usdcBalance = getBalance(walletAddress, 'usdc');
+
+	// Format balances for display
+	const formattedEthBalance = ethBalance?.formatted || '0.0000';
+	const formattedUsdcBalance = usdcBalance?.formatted || '0.00';
+	const shortWalletAddress = walletAddress
+		? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+		: 'No wallet connected';
+
 	// Show loading state
 	if (isLoading || dataLoading) {
 		return (
@@ -343,6 +383,20 @@ export default function BusinessDashboard() {
 						<Ionicons name='notifications-outline' size={24} color='#6B7280' />
 					</TouchableOpacity>
 				</View>
+
+				{/* Wallet Balance Card */}
+				{walletAddress && (
+					<View style={{ marginBottom: 24, marginHorizontal: 24 }}>
+						<WalletCard
+							usdcBalance={formattedUsdcBalance}
+							ethBalance={formattedEthBalance}
+							walletAddress={shortWalletAddress}
+							onSendPress={() => setShowSendModal(true)}
+							showEthBalance={true}
+							showWalletAddress={true}
+						/>
+					</View>
+				)}
 
 				{/* Business Stats Cards */}
 				{businessStats ? (
