@@ -7,7 +7,7 @@ interface XPProgressProps {
 	currentXP: number;
 	nextLevelXP: number;
 	progressPercentage: number;
-	gradientColors?: string[];
+	gradientColors?: readonly [string, string, ...string[]];
 	className?: string;
 }
 

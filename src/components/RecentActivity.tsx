@@ -28,7 +28,10 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({
 	className = '',
 }) => {
 	return (
-		<View className={`p-6 mb-6 bg-white shadow-sm rounded-2xl ${className}`}>
+		<View
+			className={`p-6 mb-6 bg-white shadow-sm rounded-2xl ${className}`}
+			style={{ marginBottom: 112 }}
+		>
 			<View className='flex-row items-center justify-between mb-6'>
 				<Text className='text-xl font-semibold text-gray-900'>{title}</Text>
 				{showViewAll && onViewAll && (

@@ -1,7 +1,14 @@
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import {
+	View,
+	Text,
+	ScrollView,
+	TouchableOpacity,
+	AppState,
+	Alert,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useReactiveClient } from '@dynamic-labs/react-hooks';
 import {
 	WalletCard,
@@ -9,17 +16,20 @@ import {
 	QuickActions,
 	RecentActivity,
 	HomeHeader,
+	SendBottomSheet,
+	RequestBottomSheet,
 } from '@/components';
 import { dynamicClient } from '@/lib/client';
 import { Wallet } from '@dynamic-labs/client';
 import { useWalletStore } from '@/stores/walletStore';
+import { useBalanceStore, useBalanceInvalidation } from '@/stores/balanceStore';
+import { BottomSheetModal } from '@gorhom/bottom-sheet';
 
 // Default data fallbacks
 const defaultUser = {
 	firstName: 'Guest',
 	lastName: 'User',
 };
-
 
 // Dynamic wallet configurations
 const walletConfigs = [
@@ -82,34 +92,7 @@ const mockRecentActivity = [
 	},
 ];
 
-// Quick actions configuration
-const quickActions = [
-	{
-		id: 'send',
-		title: 'Send',
-		icon: 'arrow-up' as keyof typeof Ionicons.glyphMap,
-		iconColor: 'white',
-		bgColor: 'bg-blue-600',
-		onPress: () => console.log('Send button pressed - move logic to services'),
-	},
-	{
-		id: 'request',
-		title: 'Request',
-		icon: 'arrow-down' as keyof typeof Ionicons.glyphMap,
-		iconColor: 'white',
-		bgColor: 'bg-green-600',
-		onPress: () =>
-			console.log('Request button pressed - move logic to services'),
-	},
-	{
-		id: 'split',
-		title: 'Split',
-		icon: 'people' as keyof typeof Ionicons.glyphMap,
-		iconColor: '#3D5AFE',
-		bgColor: 'bg-gray-200',
-		onPress: () => console.log('Split button pressed - move logic to services'),
-	},
-];
+// Quick actions configuration - will be defined inside component to access refs
 
 export default function HomeScreen() {
 	const { auth, wallets } = useReactiveClient(dynamicClient);
@@ -122,25 +105,36 @@ export default function HomeScreen() {
 	const [userData, setUserData] = useState(defaultUser);
 	const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
 
-	// Use Zustand store for wallet state
+	// Bottom sheet refs
+	const sendBottomSheetRef = useRef<BottomSheetModal>(null);
+	const requestBottomSheetRef = useRef<BottomSheetModal>(null);
+
+	// Use simplified wallet store for connection state
 	const {
 		isConnected: isWalletConnected,
-		isLoading: isWalletLoading,
-		balances,
 		address: walletAddress,
 		shortAddress,
-		error: walletError,
-		fetchBalances,
-		setConnected,
+		setWallet,
 		reset: resetWallet,
 	} = useWalletStore();
 
+	// Use balance store for balance data
+	const { fetchBalances, getBalance, isBalanceStale } = useBalanceStore();
+	const { onAppForeground } = useBalanceInvalidation();
+
+	// Get current balances from store
+	const ethBalance = walletAddress ? getBalance(walletAddress, 'eth') : null;
+	const usdcBalance = walletAddress ? getBalance(walletAddress, 'usdc') : null;
+
 	// Create wallet data object for compatibility with existing components
-	const walletData = useMemo(() => ({
-		usdcBalance: balances.usdc,
-		ethBalance: balances.eth,
-		walletAddress: shortAddress || 'Not connected',
-	}), [balances.usdc, balances.eth, shortAddress]);
+	const walletData = useMemo(
+		() => ({
+			usdcBalance: usdcBalance?.formatted || '0.00',
+			ethBalance: ethBalance?.formatted || '0.0000',
+			walletAddress: shortAddress || 'Not connected',
+		}),
+		[ethBalance?.formatted, usdcBalance?.formatted, shortAddress]
+	);
 
 	// Check if wallet should be connected based on Dynamic state
 	const shouldBeConnected = auth.token && wallets.userWallets.length > 0;
@@ -173,14 +167,11 @@ export default function HomeScreen() {
 		if (shouldBeConnected && wallets.userWallets.length > 0) {
 			const wallet = wallets.userWallets[0];
 			const address = wallet?.address;
-			
+
 			if (address) {
 				setConnectedWallet(wallet);
-				setConnected(true);
-				
-				// Fetch balances using the store
-				fetchBalances(address);
-				console.log('Wallet connected, fetching balances for:', address);
+				setWallet(address); // This sets address, shortAddress, and isConnected
+				console.log('Wallet connected:', address);
 			}
 		} else {
 			// Reset wallet state when not connected
@@ -188,19 +179,41 @@ export default function HomeScreen() {
 			resetWallet();
 			console.log('Wallet disconnected, resetting state');
 		}
-	}, [shouldBeConnected, wallets.userWallets, fetchBalances, setConnected, resetWallet]);
+	}, [shouldBeConnected, wallets.userWallets, setWallet, resetWallet]);
 
-	// Auto-refresh balances every 2 minutes when connected
+	// Fetch balances only when wallet first connects or on specific events
 	useEffect(() => {
-		if (!isWalletConnected || !walletAddress) return;
+		if (walletAddress && isWalletConnected) {
+			console.log(
+				'Fetching initial balances for connected wallet:',
+				walletAddress
+			);
+			fetchBalances(walletAddress);
+		}
+	}, [walletAddress, isWalletConnected, fetchBalances]);
 
-		const interval = setInterval(() => {
-			console.log('Auto-refreshing balances...');
-			fetchBalances(walletAddress); // Normal fetch, respects debouncing
-		}, 120000); // 2 minutes
+	// Monitor app state changes for smart balance refreshing
+	useEffect(() => {
+		if (!walletAddress) return;
 
-		return () => clearInterval(interval);
-	}, [isWalletConnected, walletAddress, fetchBalances]);
+		const handleAppStateChange = (nextAppState: string) => {
+			if (nextAppState === 'active') {
+				// App came to foreground, check if balances are stale
+				const isStale = isBalanceStale(walletAddress, 30000); // 30 seconds threshold
+				if (isStale) {
+					console.log('App became active, refreshing stale balances');
+					onAppForeground(walletAddress);
+					fetchBalances(walletAddress);
+				}
+			}
+		};
+
+		const subscription = AppState.addEventListener(
+			'change',
+			handleAppStateChange
+		);
+		return () => subscription?.remove();
+	}, [walletAddress, isBalanceStale, onAppForeground, fetchBalances]);
 
 	// Update user data from Dynamic auth
 	useEffect(() => {
@@ -240,31 +253,21 @@ export default function HomeScreen() {
 		}
 
 		console.log('Send button pressed with wallet:', connectedWallet.address);
-
-		try {
-			// For now, just log the action
-			// In a real implementation, you would open a send modal
-			console.log('Opening send payment modal...');
-
-			// You can implement a send modal here or navigate to a send screen
-			// For example: router.push('/send-payment');
-		} catch (error) {
-			console.error('Error in handleSend:', error);
-		}
+		// Open send bottom sheet
+		sendBottomSheetRef.current?.present();
 	};
 
 	const handleRefresh = async () => {
-		console.log('Refresh button pressed - force refreshing wallet data');
+		if (!walletAddress) return;
+
+		console.log('Manual refresh requested for:', walletAddress);
 		setIsLoading(true);
 
 		try {
-			// Force refresh balances even if recently fetched
-			if (connectedWallet && walletAddress) {
-				await fetchBalances(walletAddress, true); // Force refresh
-				console.log('Balances force refreshed via store');
-			}
+			await fetchBalances(walletAddress, true); // Force refresh
+			console.log('Manual refresh completed');
 		} catch (error) {
-			console.error('Error refreshing balance:', error);
+			console.error('Error during manual refresh:', error);
 		} finally {
 			setIsLoading(false);
 		}
@@ -291,6 +294,76 @@ export default function HomeScreen() {
 		const nextIndex = (currentIndex + 1) % walletConfigs.length;
 		setCurrentWalletConfig(walletConfigs[nextIndex]);
 		console.log('Switched to wallet config:', walletConfigs[nextIndex].name);
+	};
+
+	// Quick actions configuration
+	const quickActions = [
+		{
+			id: 'send',
+			title: 'Send',
+			icon: 'arrow-up' as keyof typeof Ionicons.glyphMap,
+			iconColor: 'white',
+			bgColor: 'bg-blue-600',
+			onPress: () => {
+				if (!connectedWallet) {
+					Alert.alert('Wallet Required', 'Please connect your wallet first');
+					return;
+				}
+				sendBottomSheetRef.current?.present();
+			},
+		},
+		{
+			id: 'request',
+			title: 'Request',
+			icon: 'arrow-down' as keyof typeof Ionicons.glyphMap,
+			iconColor: 'white',
+			bgColor: 'bg-green-600',
+			onPress: () => {
+				requestBottomSheetRef.current?.present();
+			},
+		},
+		{
+			id: 'split',
+			title: 'Split',
+			icon: 'people' as keyof typeof Ionicons.glyphMap,
+			iconColor: '#3D5AFE',
+			bgColor: 'bg-gray-200',
+			onPress: () =>
+				console.log('Split button pressed - move logic to services'),
+		},
+	];
+
+	// Handle send completion
+	const handleSendComplete = (
+		amount: number,
+		recipients: string[],
+		note: string
+	) => {
+		console.log('Send completed:', { amount, recipients, note });
+		// Update stats
+		setDynamicStats((prev) => ({
+			...prev,
+			sent: prev.sent + amount,
+			transactions: prev.transactions + 1,
+		}));
+		// Close bottom sheet
+		sendBottomSheetRef.current?.dismiss();
+	};
+
+	// Handle request completion
+	const handleRequestComplete = (
+		amount: number,
+		requesters: string[],
+		note: string
+	) => {
+		console.log('Request completed:', { amount, requesters, note });
+		Alert.alert(
+			'Request Sent!',
+			`Successfully requested $${amount} from ${requesters.join(', ')}`,
+			[{ text: 'OK' }]
+		);
+		// Close bottom sheet
+		requestBottomSheetRef.current?.dismiss();
 	};
 
 	return (
@@ -363,9 +436,21 @@ export default function HomeScreen() {
 				<RecentActivity
 					activities={mockRecentActivity}
 					onViewAll={handleViewAllActivity}
-					className='mb-32 web:mb-8'
+					className='web:mb-8'
 				/>
 			</ScrollView>
+
+			{/* Send Bottom Sheet */}
+			<SendBottomSheet
+				bottomSheetModalRef={sendBottomSheetRef}
+				onSend={handleSendComplete}
+			/>
+
+			{/* Request Bottom Sheet */}
+			<RequestBottomSheet
+				bottomSheetModalRef={requestBottomSheetRef}
+				onRequest={handleRequestComplete}
+			/>
 		</SafeAreaView>
 	);
 }
