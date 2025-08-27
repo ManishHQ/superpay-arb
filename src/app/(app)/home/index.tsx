@@ -16,14 +16,13 @@ import {
 	QuickActions,
 	RecentActivity,
 	HomeHeader,
-	SendBottomSheet,
-	RequestBottomSheet,
+	SendModal,
+	RequestModal,
 } from '@/components';
 import { dynamicClient } from '@/lib/client';
 import { Wallet } from '@dynamic-labs/client';
 import { useWalletStore } from '@/stores/walletStore';
 import { useBalanceStore, useBalanceInvalidation } from '@/stores/balanceStore';
-import { BottomSheetModal } from '@gorhom/bottom-sheet';
 
 // Default data fallbacks
 const defaultUser = {
@@ -105,9 +104,9 @@ export default function HomeScreen() {
 	const [userData, setUserData] = useState(defaultUser);
 	const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
 
-	// Bottom sheet refs
-	const sendBottomSheetRef = useRef<BottomSheetModal>(null);
-	const requestBottomSheetRef = useRef<BottomSheetModal>(null);
+	// Modal states
+	const [sendModalVisible, setSendModalVisible] = useState(false);
+	const [requestModalVisible, setRequestModalVisible] = useState(false);
 
 	// Use simplified wallet store for connection state
 	const {
@@ -138,10 +137,6 @@ export default function HomeScreen() {
 
 	// Check if wallet should be connected based on Dynamic state
 	const shouldBeConnected = auth.token && wallets.userWallets.length > 0;
-
-	console.log('isWalletConnected', isWalletConnected);
-	console.log('wallets.userWallets', wallets.userWallets);
-	console.log('auth.token', auth.token);
 
 	// Update greeting based on time of day
 	useEffect(() => {
@@ -253,8 +248,8 @@ export default function HomeScreen() {
 		}
 
 		console.log('Send button pressed with wallet:', connectedWallet.address);
-		// Open send bottom sheet
-		sendBottomSheetRef.current?.present();
+		// Open send modal
+		setSendModalVisible(true);
 	};
 
 	const handleRefresh = async () => {
@@ -288,6 +283,11 @@ export default function HomeScreen() {
 	};
 
 	const cycleWalletConfig = () => {
+		if (!currentWalletConfig) {
+			dynamicClient.ui.auth.show();
+			return;
+		}
+
 		const currentIndex = walletConfigs.findIndex(
 			(config) => config.id === currentWalletConfig.id
 		);
@@ -309,7 +309,7 @@ export default function HomeScreen() {
 					Alert.alert('Wallet Required', 'Please connect your wallet first');
 					return;
 				}
-				sendBottomSheetRef.current?.present();
+				setSendModalVisible(true);
 			},
 		},
 		{
@@ -319,17 +319,19 @@ export default function HomeScreen() {
 			iconColor: 'white',
 			bgColor: 'bg-green-600',
 			onPress: () => {
-				requestBottomSheetRef.current?.present();
+				setRequestModalVisible(true);
 			},
 		},
 		{
-			id: 'split',
-			title: 'Split',
-			icon: 'people' as keyof typeof Ionicons.glyphMap,
-			iconColor: '#3D5AFE',
-			bgColor: 'bg-gray-200',
-			onPress: () =>
-				console.log('Split button pressed - move logic to services'),
+			id: 'savings',
+			title: 'Save',
+			icon: 'wallet' as keyof typeof Ionicons.glyphMap,
+			iconColor: 'white',
+			bgColor: 'bg-purple-600',
+			onPress: () => {
+				// Navigate to savings pots (Activity screen)
+				console.log('Navigate to savings pots');
+			},
 		},
 	];
 
@@ -337,17 +339,27 @@ export default function HomeScreen() {
 	const handleSendComplete = (
 		amount: number,
 		recipients: string[],
-		note: string
+		note: string,
+		currency: 'USDC' | 'ETH'
 	) => {
-		console.log('Send completed:', { amount, recipients, note });
+		console.log('Send completed:', { amount, recipients, note, currency });
 		// Update stats
 		setDynamicStats((prev) => ({
 			...prev,
 			sent: prev.sent + amount,
 			transactions: prev.transactions + 1,
 		}));
-		// Close bottom sheet
-		sendBottomSheetRef.current?.dismiss();
+
+		// Invalidate balances to trigger refresh
+		if (walletAddress) {
+			// Force refresh balances after sending
+			setTimeout(() => {
+				fetchBalances(walletAddress, true);
+			}, 2000); // Wait 2 seconds for transaction to be confirmed
+		}
+
+		// Close modal
+		setSendModalVisible(false);
 	};
 
 	// Handle request completion
@@ -362,8 +374,8 @@ export default function HomeScreen() {
 			`Successfully requested $${amount} from ${requesters.join(', ')}`,
 			[{ text: 'OK' }]
 		);
-		// Close bottom sheet
-		requestBottomSheetRef.current?.dismiss();
+		// Close modal
+		setRequestModalVisible(false);
 	};
 
 	return (
@@ -376,7 +388,7 @@ export default function HomeScreen() {
 				{/* Header */}
 				<HomeHeader
 					firstName={userData.firstName}
-					subtitle={`${greeting}! Here is your summary for the week.`}
+					subtitle={`${greeting}!`}
 					onNotificationPress={() => console.log('Notifications pressed')}
 				/>
 
@@ -408,15 +420,17 @@ export default function HomeScreen() {
 				{/* Balance Card */}
 				<View className='mb-6'>
 					<TouchableOpacity onPress={cycleWalletConfig} activeOpacity={0.8}>
-						<WalletCard
-							usdcBalance={walletData.usdcBalance}
-							ethBalance={walletData.ethBalance}
-							walletAddress={walletData.walletAddress}
-							onSendPress={handleSend}
-							gradientColors={currentWalletConfig.gradientColors}
-							showEthBalance={currentWalletConfig.showEthBalance}
-							showWalletAddress={currentWalletConfig.showWalletAddress}
-						/>
+						{currentWalletConfig && (
+							<WalletCard
+								usdcBalance={walletData.usdcBalance}
+								ethBalance={walletData.ethBalance}
+								walletAddress={walletData.walletAddress}
+								onSendPress={handleSend}
+								gradientColors={currentWalletConfig.gradientColors}
+								showEthBalance={currentWalletConfig.showEthBalance}
+								showWalletAddress={currentWalletConfig.showWalletAddress}
+							/>
+						)}
 					</TouchableOpacity>
 				</View>
 
@@ -440,15 +454,17 @@ export default function HomeScreen() {
 				/>
 			</ScrollView>
 
-			{/* Send Bottom Sheet */}
-			<SendBottomSheet
-				bottomSheetModalRef={sendBottomSheetRef}
+			{/* Send Modal */}
+			<SendModal
+				visible={sendModalVisible}
+				onClose={() => setSendModalVisible(false)}
 				onSend={handleSendComplete}
 			/>
 
-			{/* Request Bottom Sheet */}
-			<RequestBottomSheet
-				bottomSheetModalRef={requestBottomSheetRef}
+			{/* Request Modal */}
+			<RequestModal
+				visible={requestModalVisible}
+				onClose={() => setRequestModalVisible(false)}
 				onRequest={handleRequestComplete}
 			/>
 		</SafeAreaView>

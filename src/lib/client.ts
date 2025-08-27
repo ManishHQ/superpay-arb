@@ -28,16 +28,11 @@ export const publicClient = dynamicClient.viem.createPublicClient({
 	chain: seiTestnet,
 });
 
-export const getWalletClient = () => {
+export const walletClient = async () => {
 	try {
-		const userWallets = dynamicClient.wallets.userWallets;
-		if (!userWallets || userWallets.length === 0) {
-			console.warn('No user wallets available');
-			return null;
-		}
-		
-		return dynamicClient.viem.createWalletClient({
-			wallet: userWallets[0],
+		return await dynamicClient.viem.createWalletClient({
+			wallet: dynamicClient.wallets.primary!,
+			chain: seiTestnet,
 		});
 	} catch (error) {
 		console.error('Error creating wallet client:', error);

@@ -6,16 +6,19 @@ import '../global.css';
 
 export default function AppLayout() {
 	return (
-		<GestureHandlerRootView style={{ flex: 1 }}>
+		<>
 			<dynamicClient.reactNative.WebView />
-			<BottomSheetModalProvider>
-				<Stack>
-					<Stack.Screen name='index' options={{ headerShown: false }} />
-					<Stack.Screen name='login/index' options={{ headerShown: false }} />
-					<Stack.Screen name='login' options={{ headerShown: false }} />
-					<Stack.Screen name='(tabs)' options={{ headerShown: false }} />
-				</Stack>
-			</BottomSheetModalProvider>
-		</GestureHandlerRootView>
+			<GestureHandlerRootView style={{ flex: 1 }}>
+				<BottomSheetModalProvider>
+					<Stack>
+						<Stack.Screen name='index' options={{ headerShown: false }} />
+						<Stack.Screen name='login/index' options={{ headerShown: false }} />
+						<Stack.Screen name='login' options={{ headerShown: false }} />
+						<Stack.Screen name='(app)' options={{ headerShown: false }} />
+						<Stack.Screen name='business' options={{ headerShown: false }} />
+					</Stack>
+				</BottomSheetModalProvider>
+			</GestureHandlerRootView>
+		</>
 	);
 }

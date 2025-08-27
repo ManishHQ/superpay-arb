@@ -69,13 +69,17 @@ export default function TabLayout() {
 		const checkAuthStatus = async () => {
 			try {
 				// Simple check: must have auth token AND connected wallets
-				const isLoggedIn = !!(auth.token && wallets.userWallets && wallets.userWallets.length > 0);
-				
+				const isLoggedIn = !!(
+					auth.token &&
+					wallets.userWallets &&
+					wallets.userWallets.length > 0
+				);
+
 				console.log('Tab layout auth check (simplified):');
 				console.log('- auth.token:', !!auth.token);
 				console.log('- wallets count:', wallets.userWallets?.length || 0);
 				console.log('- final authenticated:', isLoggedIn);
-				
+
 				setIsAuthenticated(isLoggedIn);
 			} catch (error) {
 				console.error('Error checking auth status in tabs:', error);
@@ -133,11 +137,11 @@ export default function TabLayout() {
 					}}
 				/>
 				<Tabs.Screen
-					name='activity/index'
+					name='pots/index'
 					options={{
-						title: 'Activity',
+						title: 'Pots',
 						tabBarIcon: ({ color, focused }) => (
-							<FontAwesome6 name='money-bill-1-wave' size={24} color={color} />
+							<FontAwesome6 name='piggy-bank' size={24} color={color} />
 						),
 					}}
 				/>

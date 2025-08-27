@@ -22,7 +22,6 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
 					<Text className='text-2xl font-bold text-gray-900'>
 						Welcome back, {firstName}!
 					</Text>
-					<Text className='text-base text-gray-600'>{subtitle}</Text>
 				</View>
 
 				{onNotificationPress && (

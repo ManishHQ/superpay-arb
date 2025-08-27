@@ -9,7 +9,7 @@ export default function OnboardingScreen() {
 		console.log('Onboarding completed:', userData);
 
 		// Navigate to home after successful onboarding
-		router.replace('/(tabs)/home');
+		router.replace('/home');
 	};
 
 	return (

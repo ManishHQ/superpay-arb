@@ -1,9 +1,8 @@
 export * from './OnboardingFlow';
-export * from './SendModal';
-export { default as SendBottomSheet } from './SendBottomSheet';
+export * from './OnboardingModal';
+export { default as SendModal } from './SendModal';
+export { default as RequestModal } from './RequestModal';
 export { default as UserSearch } from './UserSearch';
-export { default as RequestBottomSheet } from './RequestBottomSheet';
-export * from './SplitBottomSheet';
 export * from './PaymentMethodSelector';
 export * from './CreateActivityModal';
 export * from './WalletCard';
