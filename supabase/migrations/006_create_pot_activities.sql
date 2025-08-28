@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS pot_activities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pot_id TEXT NOT NULL,
+  pot_id UUID NOT NULL,
   transaction_id UUID REFERENCES transactions(id) ON DELETE CASCADE,
   activity_type TEXT NOT NULL CHECK (activity_type IN (
     'deposit',
@@ -17,11 +17,9 @@ CREATE TABLE IF NOT EXISTS pot_activities (
   currency TEXT NOT NULL DEFAULT 'USDC',
   description TEXT,
   metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 
-  -- Foreign key constraint for pot_id (assuming pots table exists)
-  -- This would need to be updated based on your actual pots table structure
-  CONSTRAINT fk_pot_activities_pot FOREIGN KEY (pot_id) REFERENCES user_pots(id) ON DELETE CASCADE
+  -- Foreign key constraint will be added in migration 007 after user_pots table is created
 );
 
 -- Add indexes for better query performance
@@ -41,31 +39,4 @@ COMMENT ON COLUMN pot_activities.metadata IS 'Additional metadata for the activi
 -- Enable Row Level Security
 ALTER TABLE pot_activities ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies (assuming user_pots table has user_id)
--- These policies ensure users can only see activities for their own pots
-CREATE POLICY "Users can view their own pot activities" ON pot_activities
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM user_pots
-      WHERE user_pots.id = pot_activities.pot_id
-      AND user_pots.user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can insert activities for their own pots" ON pot_activities
-  FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM user_pots
-      WHERE user_pots.id = pot_activities.pot_id
-      AND user_pots.user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can update activities for their own pots" ON pot_activities
-  FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM user_pots
-      WHERE user_pots.id = pot_activities.pot_id
-      AND user_pots.user_id = auth.uid()
-    )
-  );
+-- RLS policies will be added in migration 007 after user_pots table is created

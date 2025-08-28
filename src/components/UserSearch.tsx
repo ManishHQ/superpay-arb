@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -7,6 +7,8 @@ import {
 	TouchableOpacity,
 	ScrollView,
 	ActivityIndicator,
+	KeyboardAvoidingView,
+	Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -181,74 +183,79 @@ export default function UserSearch({
 			onRequestClose={onClose}
 		>
 			<SafeAreaView className='flex-1 bg-white'>
-				{/* Header */}
-				<View className='flex-row items-center justify-between p-6 border-b border-gray-200'>
-					<Text className='text-xl font-bold text-gray-900'>{title}</Text>
-					<TouchableOpacity onPress={onClose} className='p-2'>
-						<Ionicons name='close' size={24} color='#666' />
-					</TouchableOpacity>
-				</View>
-
-				{/* Search Input */}
-				<View className='p-6'>
-					<View className='flex-row items-center p-4 border border-gray-300 rounded-xl'>
-						<Ionicons name='search' size={20} color='#9CA3AF' />
-						<TextInput
-							placeholder={placeholder}
-							value={searchQuery}
-							onChangeText={setSearchQuery}
-							className='flex-1 ml-3 text-base'
-							placeholderTextColor='#9CA3AF'
-							autoFocus
-						/>
-						{searchQuery.length > 0 && (
-							<TouchableOpacity onPress={() => setSearchQuery('')}>
-								<Ionicons name='close-circle' size={20} color='#9CA3AF' />
-							</TouchableOpacity>
-						)}
+				<KeyboardAvoidingView
+					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+					style={{ flex: 1 }}
+				>
+					{/* Header */}
+					<View className='flex-row items-center justify-between p-6 border-b border-gray-200'>
+						<Text className='text-xl font-bold text-gray-900'>{title}</Text>
+						<TouchableOpacity onPress={onClose} className='p-2'>
+							<Ionicons name='close' size={24} color='#666' />
+						</TouchableOpacity>
 					</View>
-				</View>
 
-				{/* Results */}
-				<ScrollView className='flex-1'>
-					{searchQuery.length < minSearchLength ? (
-						<View className='items-center justify-center flex-1 p-6'>
-							<Ionicons name='search' size={64} color='#D1D5DB' />
-							<Text className='mt-4 text-lg font-medium text-gray-500'>
-								Start typing to search
-							</Text>
-							<Text className='mt-2 text-sm text-center text-gray-400'>
-								Enter at least {minSearchLength} character
-								{minSearchLength !== 1 ? 's' : ''} to begin searching
-							</Text>
+					{/* Search Input */}
+					<View className='p-6'>
+						<View className='flex-row items-center p-4 border border-gray-300 rounded-xl'>
+							<Ionicons name='search' size={20} color='#9CA3AF' />
+							<TextInput
+								placeholder={placeholder}
+								value={searchQuery}
+								onChangeText={setSearchQuery}
+								className='flex-1 ml-3 text-base'
+								placeholderTextColor='#9CA3AF'
+								autoFocus
+							/>
+							{searchQuery.length > 0 && (
+								<TouchableOpacity onPress={() => setSearchQuery('')}>
+									<Ionicons name='close-circle' size={20} color='#9CA3AF' />
+								</TouchableOpacity>
+							)}
 						</View>
-					) : isLoading ? (
-						<View className='items-center justify-center flex-1 p-6'>
-							<ActivityIndicator size='large' color='#3B82F6' />
-							<Text className='mt-4 text-lg text-gray-600'>Searching...</Text>
-						</View>
-					) : searchResults.length === 0 ? (
-						<View className='items-center justify-center flex-1 p-6'>
-							<Ionicons name='person-outline' size={64} color='#D1D5DB' />
-							<Text className='mt-4 text-lg font-medium text-gray-500'>
-								No users found
-							</Text>
-							<Text className='mt-2 text-sm text-center text-gray-400'>
-								Try adjusting your search terms
-							</Text>
-						</View>
-					) : (
-						<View>
-							<View className='px-6 py-3 bg-gray-50'>
-								<Text className='text-sm font-medium text-gray-600'>
-									{searchResults.length} result
-									{searchResults.length !== 1 ? 's' : ''} found
+					</View>
+
+					{/* Results */}
+					<ScrollView className='flex-1' keyboardShouldPersistTaps='handled'>
+						{searchQuery.length < minSearchLength ? (
+							<View className='items-center justify-center flex-1 p-6'>
+								<Ionicons name='search' size={64} color='#D1D5DB' />
+								<Text className='mt-4 text-lg font-medium text-gray-500'>
+									Start typing to search
+								</Text>
+								<Text className='mt-2 text-sm text-center text-gray-400'>
+									Enter at least {minSearchLength} character
+									{minSearchLength !== 1 ? 's' : ''} to begin searching
 								</Text>
 							</View>
-							{searchResults.map(renderUserItem)}
-						</View>
-					)}
-				</ScrollView>
+						) : isLoading ? (
+							<View className='items-center justify-center flex-1 p-6'>
+								<ActivityIndicator size='large' color='#3B82F6' />
+								<Text className='mt-4 text-lg text-gray-600'>Searching...</Text>
+							</View>
+						) : searchResults.length === 0 ? (
+							<View className='items-center justify-center flex-1 p-6'>
+								<Ionicons name='person-outline' size={64} color='#D1D5DB' />
+								<Text className='mt-4 text-lg font-medium text-gray-500'>
+									No users found
+								</Text>
+								<Text className='mt-2 text-sm text-center text-gray-400'>
+									Try adjusting your search terms
+								</Text>
+							</View>
+						) : (
+							<View>
+								<View className='px-6 py-3 bg-gray-50'>
+									<Text className='text-sm font-medium text-gray-600'>
+										{searchResults.length} result
+										{searchResults.length !== 1 ? 's' : ''} found
+									</Text>
+								</View>
+								{searchResults.map(renderUserItem)}
+							</View>
+						)}
+					</ScrollView>
+				</KeyboardAvoidingView>
 			</SafeAreaView>
 		</Modal>
 	);

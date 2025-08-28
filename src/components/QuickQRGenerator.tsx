@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
 	View,
 	Text,
@@ -7,6 +7,9 @@ import {
 	StyleSheet,
 	TextInput,
 	Share,
+	KeyboardAvoidingView,
+	Platform,
+	ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
@@ -23,21 +26,28 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
 		justifyContent: 'center',
 		alignItems: 'center',
+		paddingHorizontal: 20,
+		paddingVertical: 20,
 	},
 	modal: {
 		backgroundColor: '#ffffff',
 		borderRadius: 20,
-		padding: 24,
-		width: '90%',
-		maxWidth: 400,
+		padding: 20,
+		width: '100%',
+		maxWidth: 380,
 		alignItems: 'center',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 10 },
+		shadowOpacity: 0.25,
+		shadowRadius: 20,
+		elevation: 10,
 	},
 	header: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
 		width: '100%',
-		marginBottom: 24,
+		marginBottom: 16,
 	},
 	title: {
 		fontSize: 20,
@@ -49,15 +59,15 @@ const styles = StyleSheet.create({
 	},
 	quickForm: {
 		width: '100%',
-		marginBottom: 24,
+		marginBottom: 16,
 	},
 	input: {
 		borderWidth: 1,
 		borderColor: '#d1d5db',
 		borderRadius: 12,
-		padding: 16,
+		padding: 14,
 		fontSize: 16,
-		marginBottom: 12,
+		marginBottom: 10,
 		backgroundColor: '#f9fafb',
 	},
 	currencyInput: {
@@ -67,7 +77,7 @@ const styles = StyleSheet.create({
 		borderColor: '#d1d5db',
 		borderRadius: 12,
 		backgroundColor: '#f9fafb',
-		marginBottom: 12,
+		marginBottom: 10,
 	},
 	currencySymbol: {
 		paddingLeft: 16,
@@ -82,7 +92,7 @@ const styles = StyleSheet.create({
 	},
 	generateButton: {
 		backgroundColor: '#3b82f6',
-		padding: 16,
+		padding: 14,
 		borderRadius: 12,
 		alignItems: 'center',
 		width: '100%',
@@ -175,7 +185,8 @@ export const QuickQRGenerator: React.FC<QuickQRGeneratorProps> = ({
 	const [description, setDescription] = useState('');
 	const [qrData, setQrData] = useState<string | null>(null);
 
-	const businessName = currentProfile?.business_name || currentProfile?.display_name || 'Business';
+	const businessName =
+		currentProfile?.business_name || currentProfile?.display_name || 'Business';
 
 	const resetForm = () => {
 		setAmount('');
@@ -227,91 +238,117 @@ export const QuickQRGenerator: React.FC<QuickQRGeneratorProps> = ({
 	const isFormValid = amount && parseFloat(amount) > 0;
 
 	return (
-		<Modal visible={visible} transparent animationType="fade">
-			<View style={styles.overlay}>
+		<Modal visible={visible} transparent animationType='fade'>
+			<KeyboardAvoidingView
+				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				style={styles.overlay}
+			>
 				<View style={styles.modal}>
-					<View style={styles.header}>
-						<Text style={styles.title}>Quick QR Payment</Text>
-						<TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-							<Ionicons name="close" size={24} color="#6b7280" />
-						</TouchableOpacity>
-					</View>
+					<ScrollView
+						contentContainerStyle={{ paddingBottom: 0 }}
+						keyboardShouldPersistTaps='handled'
+						showsVerticalScrollIndicator={false}
+					>
+						<View style={styles.header}>
+							<Text style={styles.title}>Quick QR Payment</Text>
+							<TouchableOpacity
+								style={styles.closeButton}
+								onPress={handleClose}
+							>
+								<Ionicons name='close' size={24} color='#6b7280' />
+							</TouchableOpacity>
+						</View>
 
-					{!qrData ? (
-						<>
-							<View style={styles.quickForm}>
-								<View style={styles.currencyInput}>
-									<Text style={styles.currencySymbol}>$</Text>
+						{!qrData ? (
+							<>
+								<View style={styles.quickForm}>
+									<View style={styles.currencyInput}>
+										<Text style={styles.currencySymbol}>$</Text>
+										<TextInput
+											style={styles.amountInput}
+											value={amount}
+											onChangeText={setAmount}
+											placeholder='0.00'
+											keyboardType='numeric'
+											returnKeyType='next'
+										/>
+									</View>
+
 									<TextInput
-										style={styles.amountInput}
-										value={amount}
-										onChangeText={setAmount}
-										placeholder="0.00"
-										keyboardType="numeric"
-										returnKeyType="next"
+										style={styles.input}
+										value={description}
+										onChangeText={setDescription}
+										placeholder="What's this payment for? (optional)"
+										returnKeyType='done'
 									/>
 								</View>
-								
-								<TextInput
-									style={styles.input}
-									value={description}
-									onChangeText={setDescription}
-									placeholder="What's this payment for? (optional)"
-									returnKeyType="done"
-								/>
-							</View>
 
-							<TouchableOpacity
-								style={[styles.generateButton, !isFormValid && styles.generateButtonDisabled]}
-								onPress={generateQR}
-								disabled={!isFormValid}
-							>
-								<Text style={styles.generateButtonText}>Generate QR Code</Text>
-							</TouchableOpacity>
-						</>
-					) : (
-						<View style={styles.qrSection}>
-							<View style={styles.qrInfo}>
-								<Text style={styles.qrAmount}>${amount}</Text>
-								{description && <Text style={styles.qrDescription}>{description}</Text>}
-								<Text style={styles.qrInstructions}>
-									Show this QR code to customers for instant payment
-								</Text>
-							</View>
-
-							<View style={styles.qrContainer}>
-								<QRCode
-									value={qrData}
-									size={200}
-									backgroundColor="#ffffff"
-									color="#000000"
-								/>
-							</View>
-
-							<View style={styles.qrButtons}>
 								<TouchableOpacity
-									style={[styles.qrButton, styles.qrButtonSecondary]}
-									onPress={() => setQrData(null)}
+									style={[
+										styles.generateButton,
+										!isFormValid && styles.generateButtonDisabled,
+									]}
+									onPress={generateQR}
+									disabled={!isFormValid}
 								>
-									<Ionicons name="pencil" size={16} color="#374151" />
-									<Text style={[styles.qrButtonText, styles.qrButtonTextSecondary]}>
-										New QR
+									<Text style={styles.generateButtonText}>
+										Generate QR Code
 									</Text>
 								</TouchableOpacity>
-								<TouchableOpacity
-									style={[styles.qrButton, styles.qrButtonPrimary]}
-									onPress={shareQR}
-								>
-									<Ionicons name="share" size={16} color="#ffffff" />
-									<Text style={[styles.qrButtonText, styles.qrButtonTextPrimary]}>
-										Share
+							</>
+						) : (
+							<View style={styles.qrSection}>
+								<View style={styles.qrInfo}>
+									<Text style={styles.qrAmount}>${amount}</Text>
+									{description && (
+										<Text style={styles.qrDescription}>{description}</Text>
+									)}
+									<Text style={styles.qrInstructions}>
+										Show this QR code to customers for instant payment
 									</Text>
-								</TouchableOpacity>
+								</View>
+
+								<View style={styles.qrContainer}>
+									<QRCode
+										value={qrData}
+										size={200}
+										backgroundColor='#ffffff'
+										color='#000000'
+									/>
+								</View>
+
+								<View style={styles.qrButtons}>
+									<TouchableOpacity
+										style={[styles.qrButton, styles.qrButtonSecondary]}
+										onPress={() => setQrData(null)}
+									>
+										<Ionicons name='pencil' size={16} color='#374151' />
+										<Text
+											style={[
+												styles.qrButtonText,
+												styles.qrButtonTextSecondary,
+											]}
+										>
+											New QR
+										</Text>
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={[styles.qrButton, styles.qrButtonPrimary]}
+										onPress={shareQR}
+									>
+										<Ionicons name='share' size={16} color='#ffffff' />
+										<Text
+											style={[styles.qrButtonText, styles.qrButtonTextPrimary]}
+										>
+											Share
+										</Text>
+									</TouchableOpacity>
+								</View>
 							</View>
-						</View>
-					)}
+						)}
+					</ScrollView>
 				</View>
-			</View>
+			</KeyboardAvoidingView>
 		</Modal>
 	);
 };

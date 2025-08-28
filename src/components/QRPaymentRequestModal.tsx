@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -8,6 +8,9 @@ import {
 	TextInput,
 	Alert,
 	Share,
+	ScrollView,
+	ActivityIndicator,
+	KeyboardAvoidingView,
 	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,10 +24,15 @@ interface QRPaymentRequestModalProps {
 
 const styles = StyleSheet.create({
 	overlay: {
-		flex: 1,
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
 		justifyContent: 'center',
 		alignItems: 'center',
+		zIndex: 1000,
 	},
 	modal: {
 		backgroundColor: '#ffffff',
@@ -180,7 +188,8 @@ export const QRPaymentRequestModal: React.FC<QRPaymentRequestModalProps> = ({
 	const [qrData, setQrData] = useState<string | null>(null);
 	const [showQR, setShowQR] = useState(false);
 
-	const businessName = currentProfile?.business_name || currentProfile?.display_name || 'Business';
+	const businessName =
+		currentProfile?.business_name || currentProfile?.display_name || 'Business';
 	const businessEmail = currentProfile?.email || '';
 
 	const resetForm = () => {
@@ -240,114 +249,137 @@ export const QRPaymentRequestModal: React.FC<QRPaymentRequestModalProps> = ({
 	}, [visible]);
 
 	return (
-		<Modal visible={visible} transparent animationType="fade">
+		<Modal visible={visible} transparent animationType='fade'>
 			<View style={styles.overlay}>
 				<View style={styles.modal}>
-					<View style={styles.header}>
-						<Text style={styles.title}>Request Payment</Text>
-						<TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-							<Ionicons name="close" size={24} color="#6b7280" />
-						</TouchableOpacity>
-					</View>
-
-					{!showQR ? (
-						<>
-							<View style={styles.form}>
-								<Text style={styles.label}>Amount *</Text>
-								<View style={styles.currencyInput}>
-									<Text style={styles.currencySymbol}>$</Text>
-									<TextInput
-										style={styles.amountInput}
-										value={amount}
-										onChangeText={setAmount}
-										placeholder="0.00"
-										keyboardType="numeric"
-										returnKeyType="next"
-									/>
-								</View>
-
-								<Text style={styles.label}>Description</Text>
-								<TextInput
-									style={styles.input}
-									value={description}
-									onChangeText={setDescription}
-									placeholder="Payment for..."
-									returnKeyType="next"
-									multiline
-									numberOfLines={2}
-								/>
-
-								<Text style={styles.label}>Customer Email (Optional)</Text>
-								<TextInput
-									style={styles.input}
-									value={recipientEmail}
-									onChangeText={setRecipientEmail}
-									placeholder="customer@example.com"
-									keyboardType="email-address"
-									returnKeyType="done"
-									autoCapitalize="none"
-								/>
+					<KeyboardAvoidingView
+						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+						style={{ flex: 1 }}
+					>
+						<ScrollView
+							contentContainerStyle={{ flexGrow: 1 }}
+							keyboardShouldPersistTaps='handled'
+							showsVerticalScrollIndicator={false}
+						>
+							<View style={styles.header}>
+								<Text style={styles.title}>Request Payment</Text>
+								<TouchableOpacity
+									style={styles.closeButton}
+									onPress={handleClose}
+								>
+									<Ionicons name='close' size={24} color='#6b7280' />
+								</TouchableOpacity>
 							</View>
 
-							<TouchableOpacity style={styles.generateButton} onPress={generateQRCode}>
-								<Text style={styles.generateButtonText}>Generate QR Code</Text>
-							</TouchableOpacity>
-						</>
-					) : (
-						<>
-							<View style={styles.qrContainer}>
-								<Text style={styles.qrLabel}>
-									Customer can scan this QR code to pay
-								</Text>
-								<View style={styles.qrCode}>
-									<QRCode
-										value={qrData || ''}
-										size={200}
-										backgroundColor="#ffffff"
-										color="#000000"
-									/>
-								</View>
-							</View>
+							{!showQR ? (
+								<>
+									<View style={styles.form}>
+										<Text style={styles.label}>Amount *</Text>
+										<View style={styles.currencyInput}>
+											<Text style={styles.currencySymbol}>$</Text>
+											<TextInput
+												style={styles.amountInput}
+												value={amount}
+												onChangeText={setAmount}
+												placeholder='0.00'
+												keyboardType='numeric'
+												returnKeyType='next'
+											/>
+										</View>
 
-							<View style={styles.paymentInfo}>
-								<View style={styles.infoRow}>
-									<Text style={styles.infoLabel}>Amount:</Text>
-									<Text style={styles.infoValue}>${amount}</Text>
-								</View>
-								<View style={styles.infoRow}>
-									<Text style={styles.infoLabel}>Business:</Text>
-									<Text style={styles.infoValue}>{businessName}</Text>
-								</View>
-								{description ? (
-									<View style={styles.infoRow}>
-										<Text style={styles.infoLabel}>Description:</Text>
-										<Text style={styles.infoValue}>{description}</Text>
+										<Text style={styles.label}>Description</Text>
+										<TextInput
+											style={styles.input}
+											value={description}
+											onChangeText={setDescription}
+											placeholder='Payment for...'
+											returnKeyType='next'
+											multiline
+											numberOfLines={2}
+										/>
+
+										<Text style={styles.label}>Customer Email (Optional)</Text>
+										<TextInput
+											style={styles.input}
+											value={recipientEmail}
+											onChangeText={setRecipientEmail}
+											placeholder='customer@example.com'
+											keyboardType='email-address'
+											returnKeyType='done'
+											autoCapitalize='none'
+										/>
 									</View>
-								) : null}
-							</View>
 
-							<View style={styles.buttons}>
-								<TouchableOpacity
-									style={[styles.button, styles.secondaryButton]}
-									onPress={() => setShowQR(false)}
-								>
-									<Ionicons name="pencil" size={20} color="#374151" />
-									<Text style={[styles.buttonText, styles.secondaryButtonText]}>
-										Edit
-									</Text>
-								</TouchableOpacity>
-								<TouchableOpacity
-									style={[styles.button, styles.primaryButton]}
-									onPress={shareQRCode}
-								>
-									<Ionicons name="share" size={20} color="#ffffff" />
-									<Text style={[styles.buttonText, styles.primaryButtonText]}>
-										Share
-									</Text>
-								</TouchableOpacity>
-							</View>
-						</>
-					)}
+									<TouchableOpacity
+										style={styles.generateButton}
+										onPress={generateQRCode}
+									>
+										<Text style={styles.generateButtonText}>
+											Generate QR Code
+										</Text>
+									</TouchableOpacity>
+								</>
+							) : (
+								<>
+									<View style={styles.qrContainer}>
+										<Text style={styles.qrLabel}>
+											Customer can scan this QR code to pay
+										</Text>
+										<View style={styles.qrCode}>
+											<QRCode
+												value={qrData || ''}
+												size={200}
+												backgroundColor='#ffffff'
+												color='#000000'
+											/>
+										</View>
+									</View>
+
+									<View style={styles.paymentInfo}>
+										<View style={styles.infoRow}>
+											<Text style={styles.infoLabel}>Amount:</Text>
+											<Text style={styles.infoValue}>${amount}</Text>
+										</View>
+										<View style={styles.infoRow}>
+											<Text style={styles.infoLabel}>Business:</Text>
+											<Text style={styles.infoValue}>{businessName}</Text>
+										</View>
+										{description ? (
+											<View style={styles.infoRow}>
+												<Text style={styles.infoLabel}>Description:</Text>
+												<Text style={styles.infoValue}>{description}</Text>
+											</View>
+										) : null}
+									</View>
+
+									<View style={styles.buttons}>
+										<TouchableOpacity
+											style={[styles.button, styles.secondaryButton]}
+											onPress={() => setShowQR(false)}
+										>
+											<Ionicons name='pencil' size={20} color='#374151' />
+											<Text
+												style={[styles.buttonText, styles.secondaryButtonText]}
+											>
+												Edit
+											</Text>
+										</TouchableOpacity>
+										<TouchableOpacity
+											style={[styles.button, styles.primaryButton]}
+											onPress={shareQRCode}
+										>
+											<Ionicons name='share' size={20} color='#ffffff' />
+											<Text
+												style={[styles.buttonText, styles.primaryButtonText]}
+											>
+												Share
+											</Text>
+										</TouchableOpacity>
+									</View>
+								</>
+							)}
+						</ScrollView>
+					</KeyboardAvoidingView>
 				</View>
 			</View>
 		</Modal>

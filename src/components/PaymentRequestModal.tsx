@@ -11,6 +11,8 @@ import {
 	ActivityIndicator,
 	FlatList,
 	Share,
+	KeyboardAvoidingView,
+	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
@@ -45,10 +47,15 @@ interface SelectedCustomer {
 
 const styles = StyleSheet.create({
 	overlay: {
-		flex: 1,
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
 		justifyContent: 'center',
 		alignItems: 'center',
+		zIndex: 1000,
 	},
 	modal: {
 		backgroundColor: '#ffffff',
@@ -324,7 +331,8 @@ export const PaymentRequestModal: React.FC<PaymentRequestModalProps> = ({
 	const { currentProfile, searchUsers } = useUserProfileStore();
 	const [amount, setAmount] = useState('');
 	const [description, setDescription] = useState('');
-	const [selectedCustomer, setSelectedCustomer] = useState<SelectedCustomer | null>(null);
+	const [selectedCustomer, setSelectedCustomer] =
+		useState<SelectedCustomer | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
 	const [isSearching, setIsSearching] = useState(false);
@@ -333,7 +341,8 @@ export const PaymentRequestModal: React.FC<PaymentRequestModalProps> = ({
 	const [showQR, setShowQR] = useState(false);
 	const [qrData, setQrData] = useState<string | null>(null);
 
-	const businessName = currentProfile?.business_name || currentProfile?.display_name || 'Business';
+	const businessName =
+		currentProfile?.business_name || currentProfile?.display_name || 'Business';
 
 	// Reset form when modal opens
 	useEffect(() => {
@@ -404,7 +413,10 @@ export const PaymentRequestModal: React.FC<PaymentRequestModalProps> = ({
 
 	const generateQRCode = () => {
 		if (!amount || !selectedCustomer || !description.trim()) {
-			Alert.alert('Missing Information', 'Please fill in all required fields to generate QR code');
+			Alert.alert(
+				'Missing Information',
+				'Please fill in all required fields to generate QR code'
+			);
 			return;
 		}
 
@@ -492,7 +504,9 @@ export const PaymentRequestModal: React.FC<PaymentRequestModalProps> = ({
 	};
 
 	// Simulate sending payment request (replace with actual API call)
-	const simulateSendRequest = async (requestData: PaymentRequestData): Promise<void> => {
+	const simulateSendRequest = async (
+		requestData: PaymentRequestData
+	): Promise<void> => {
 		return new Promise((resolve) => {
 			setTimeout(() => {
 				console.log('Payment request sent:', requestData);
@@ -515,212 +529,263 @@ export const PaymentRequestModal: React.FC<PaymentRequestModalProps> = ({
 		});
 	};
 
-	const isFormValid = amount && selectedCustomer && description.trim() && !isLoading;
+	const isFormValid =
+		amount && selectedCustomer && description.trim() && !isLoading;
 
 	return (
-		<Modal visible={visible} transparent animationType="fade">
+		<Modal visible={visible} transparent animationType='fade'>
 			<View style={styles.overlay}>
 				<View style={styles.modal}>
-					<View style={styles.header}>
-						<Text style={styles.title}>Request Payment</Text>
-						<TouchableOpacity style={styles.closeButton} onPress={onClose}>
-							<Ionicons name="close" size={24} color="#6b7280" />
-						</TouchableOpacity>
-					</View>
-
-					<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-						{/* Amount Section */}
-						<View style={styles.section}>
-							<Text style={styles.label}>Amount *</Text>
-							<View style={styles.currencyInput}>
-								<Text style={styles.currencySymbol}>$</Text>
-								<TextInput
-									style={styles.amountInput}
-									value={amount}
-									onChangeText={setAmount}
-									placeholder="0.00"
-									keyboardType="numeric"
-									returnKeyType="next"
-								/>
-							</View>
+					<KeyboardAvoidingView
+						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+						style={{ flex: 1 }}
+					>
+						<View style={styles.header}>
+							<Text style={styles.title}>Request Payment</Text>
+							<TouchableOpacity style={styles.closeButton} onPress={onClose}>
+								<Ionicons name='close' size={24} color='#6b7280' />
+							</TouchableOpacity>
 						</View>
 
-						{/* Description Section */}
-						<View style={styles.section}>
-							<Text style={styles.label}>Description *</Text>
-							<TextInput
-								style={[styles.input, styles.textArea]}
-								value={description}
-								onChangeText={setDescription}
-								placeholder="What is this payment for?"
-								multiline
-								numberOfLines={3}
-								textAlignVertical="top"
-							/>
-						</View>
-
-						{/* Customer Selection */}
-						<View style={styles.section}>
-							<Text style={styles.label}>Send To *</Text>
-							
-							{selectedCustomer ? (
-								<View style={styles.selectedCustomerCard}>
-									<View style={styles.customerAvatar}>
-										<Text style={styles.customerAvatarText}>
-											{selectedCustomer.full_name.charAt(0).toUpperCase()}
-										</Text>
-									</View>
-									<View style={styles.customerInfo}>
-										<Text style={styles.customerName}>{selectedCustomer.full_name}</Text>
-										<Text style={styles.customerUsername}>@{selectedCustomer.username}</Text>
-									</View>
-									<TouchableOpacity style={styles.removeButton} onPress={handleRemoveCustomer}>
-										<Ionicons name="close" size={16} color="#ffffff" />
-									</TouchableOpacity>
-								</View>
-							) : (
-								<>
-									<View style={styles.searchContainer}>
-										<Ionicons name="search" size={20} color="#9ca3af" />
-										<TextInput
-											style={styles.searchInput}
-											placeholder="Search for customers..."
-											value={searchQuery}
-											onChangeText={setSearchQuery}
-											returnKeyType="search"
-										/>
-										{isSearching && <ActivityIndicator size="small" color="#6b7280" />}
-									</View>
-
-									{searchResults.length > 0 && (
-										<View style={styles.searchResults}>
-											<FlatList
-												data={searchResults}
-												keyExtractor={(item) => item.id}
-												renderItem={({ item }) => (
-													<TouchableOpacity
-														style={styles.customerItem}
-														onPress={() => handleSelectCustomer(item)}
-													>
-														<View style={styles.customerAvatar}>
-															<Text style={styles.customerAvatarText}>
-																{(item.full_name || 'C').charAt(0).toUpperCase()}
-															</Text>
-														</View>
-														<View style={styles.customerInfo}>
-															<Text style={styles.customerName}>
-																{item.full_name || 'Unknown Customer'}
-															</Text>
-															<Text style={styles.customerUsername}>
-																@{item.username}
-															</Text>
-														</View>
-													</TouchableOpacity>
-												)}
-											/>
-										</View>
-									)}
-
-									{searchQuery.length >= 3 && searchResults.length === 0 && !isSearching && (
-										<Text style={styles.noResults}>No customers found</Text>
-									)}
-								</>
-							)}
-							
-							<Text style={styles.helperText}>
-								Search by name or username to find customers
-							</Text>
-						</View>
-
-						{/* Due Date Section (Optional) */}
-						<View style={styles.section}>
-							<View style={styles.dueDateContainer}>
-								<Text style={styles.label}>Due Date (Optional)</Text>
-								<TouchableOpacity
-									style={styles.dueDateButton}
-									onPress={() => {
-										// Here you would open a date picker
-										// For now, set to 7 days from now
-										const futureDate = new Date();
-										futureDate.setDate(futureDate.getDate() + 7);
-										setDueDate(futureDate);
-									}}
-								>
-									<Ionicons name="calendar" size={20} color="#374151" />
-									<Text style={styles.dueDateText}>
-										{dueDate ? formatDueDate(dueDate) : 'Set due date'}
-									</Text>
-								</TouchableOpacity>
-							</View>
-							{dueDate && (
-								<TouchableOpacity
-									onPress={() => setDueDate(null)}
-									style={{ marginTop: 8, alignSelf: 'flex-start' }}
-								>
-									<Text style={{ color: '#ef4444', fontSize: 14 }}>Clear due date</Text>
-								</TouchableOpacity>
-							)}
-						</View>
-
-						{/* QR Code Section */}
-						{showQR && qrData ? (
-							<View style={styles.qrSection}>
-								<Text style={styles.qrTitle}>Payment Request QR Code</Text>
-								<View style={styles.qrContainer}>
-									<QRCode
-										value={qrData}
-										size={180}
-										backgroundColor="#ffffff"
-										color="#000000"
+						<ScrollView
+							contentContainerStyle={styles.scrollContent}
+							showsVerticalScrollIndicator={false}
+							keyboardShouldPersistTaps='handled'
+						>
+							{/* Amount Section */}
+							<View style={styles.section}>
+								<Text style={styles.label}>Amount *</Text>
+								<View style={styles.currencyInput}>
+									<Text style={styles.currencySymbol}>$</Text>
+									<TextInput
+										style={styles.amountInput}
+										value={amount}
+										onChangeText={setAmount}
+										placeholder='0.00'
+										keyboardType='numeric'
+										returnKeyType='next'
 									/>
 								</View>
-								<Text style={styles.qrInstructions}>
-									Customer can scan this QR code to view and pay the request instantly
+							</View>
+
+							{/* Description Section */}
+							<View style={styles.section}>
+								<Text style={styles.label}>Description *</Text>
+								<TextInput
+									style={[styles.input, styles.textArea]}
+									value={description}
+									onChangeText={setDescription}
+									placeholder='What is this payment for?'
+									multiline
+									numberOfLines={3}
+									textAlignVertical='top'
+								/>
+							</View>
+
+							{/* Customer Selection */}
+							<View style={styles.section}>
+								<Text style={styles.label}>Send To *</Text>
+
+								{selectedCustomer ? (
+									<View style={styles.selectedCustomerCard}>
+										<View style={styles.customerAvatar}>
+											<Text style={styles.customerAvatarText}>
+												{selectedCustomer.full_name.charAt(0).toUpperCase()}
+											</Text>
+										</View>
+										<View style={styles.customerInfo}>
+											<Text style={styles.customerName}>
+												{selectedCustomer.full_name}
+											</Text>
+											<Text style={styles.customerUsername}>
+												@{selectedCustomer.username}
+											</Text>
+										</View>
+										<TouchableOpacity
+											style={styles.removeButton}
+											onPress={handleRemoveCustomer}
+										>
+											<Ionicons name='close' size={16} color='#ffffff' />
+										</TouchableOpacity>
+									</View>
+								) : (
+									<>
+										<View style={styles.searchContainer}>
+											<Ionicons name='search' size={20} color='#9ca3af' />
+											<TextInput
+												style={styles.searchInput}
+												placeholder='Search for customers...'
+												value={searchQuery}
+												onChangeText={setSearchQuery}
+												returnKeyType='search'
+											/>
+											{isSearching && (
+												<ActivityIndicator size='small' color='#6b7280' />
+											)}
+										</View>
+
+										{searchResults.length > 0 && (
+											<View style={styles.searchResults}>
+												<FlatList
+													data={searchResults}
+													keyExtractor={(item) => item.id}
+													renderItem={({ item }) => (
+														<TouchableOpacity
+															style={styles.customerItem}
+															onPress={() => handleSelectCustomer(item)}
+														>
+															<View style={styles.customerAvatar}>
+																<Text style={styles.customerAvatarText}>
+																	{(item.full_name || 'C')
+																		.charAt(0)
+																		.toUpperCase()}
+																</Text>
+															</View>
+															<View style={styles.customerInfo}>
+																<Text style={styles.customerName}>
+																	{item.full_name || 'Unknown Customer'}
+																</Text>
+																<Text style={styles.customerUsername}>
+																	@{item.username}
+																</Text>
+															</View>
+														</TouchableOpacity>
+													)}
+												/>
+											</View>
+										)}
+
+										{searchQuery.length >= 3 &&
+											searchResults.length === 0 &&
+											!isSearching && (
+												<Text style={styles.noResults}>No customers found</Text>
+											)}
+									</>
+								)}
+
+								<Text style={styles.helperText}>
+									Search by name or username to find customers
 								</Text>
-								<View style={styles.qrButtons}>
+							</View>
+
+							{/* Due Date Section (Optional) */}
+							<View style={styles.section}>
+								<View style={styles.dueDateContainer}>
+									<Text style={styles.label}>Due Date (Optional)</Text>
 									<TouchableOpacity
-										style={[styles.qrButton, styles.qrButtonSecondary]}
-										onPress={() => setShowQR(false)}
+										style={styles.dueDateButton}
+										onPress={() => {
+											// Here you would open a date picker
+											// For now, set to 7 days from now
+											const futureDate = new Date();
+											futureDate.setDate(futureDate.getDate() + 7);
+											setDueDate(futureDate);
+										}}
 									>
-										<Ionicons name="pencil" size={16} color="#374151" />
-										<Text style={[styles.qrButtonText, styles.qrButtonTextSecondary]}>
-											Edit
-										</Text>
-									</TouchableOpacity>
-									<TouchableOpacity
-										style={[styles.qrButton, styles.qrButtonPrimary]}
-										onPress={shareQRCode}
-									>
-										<Ionicons name="share" size={16} color="#ffffff" />
-										<Text style={[styles.qrButtonText, styles.qrButtonTextPrimary]}>
-											Share
+										<Ionicons name='calendar' size={20} color='#374151' />
+										<Text style={styles.dueDateText}>
+											{dueDate ? formatDueDate(dueDate) : 'Set due date'}
 										</Text>
 									</TouchableOpacity>
 								</View>
+								{dueDate && (
+									<TouchableOpacity
+										onPress={() => setDueDate(null)}
+										style={{ marginTop: 8, alignSelf: 'flex-start' }}
+									>
+										<Text style={{ color: '#ef4444', fontSize: 14 }}>
+											Clear due date
+										</Text>
+									</TouchableOpacity>
+								)}
 							</View>
-						) : isFormValid ? (
-							<TouchableOpacity style={styles.generateQRButton} onPress={generateQRCode}>
-								<Text style={styles.generateQRButtonText}>Generate QR Code</Text>
-							</TouchableOpacity>
-						) : null}
 
-						{/* Send Button */}
-						<TouchableOpacity
-							style={[styles.sendButton, !isFormValid && styles.sendButtonDisabled]}
-							onPress={handleSendRequest}
-							disabled={!isFormValid}
-						>
-							{isLoading ? (
-								<ActivityIndicator color="#ffffff" />
-							) : (
-								<>
-									<Text style={[styles.sendButtonText, !isFormValid && styles.sendButtonTextDisabled]}>
-										{showQR ? 'Send Request & QR Code' : 'Send Payment Request'}
+							{/* QR Code Section */}
+							{showQR && qrData ? (
+								<View style={styles.qrSection}>
+									<Text style={styles.qrTitle}>Payment Request QR Code</Text>
+									<View style={styles.qrContainer}>
+										<QRCode
+											value={qrData}
+											size={180}
+											backgroundColor='#ffffff'
+											color='#000000'
+										/>
+									</View>
+									<Text style={styles.qrInstructions}>
+										Customer can scan this QR code to view and pay the request
+										instantly
 									</Text>
-								</>
-							)}
-						</TouchableOpacity>
-					</ScrollView>
+									<View style={styles.qrButtons}>
+										<TouchableOpacity
+											style={[styles.qrButton, styles.qrButtonSecondary]}
+											onPress={() => setShowQR(false)}
+										>
+											<Ionicons name='pencil' size={16} color='#374151' />
+											<Text
+												style={[
+													styles.qrButtonText,
+													styles.qrButtonTextSecondary,
+												]}
+											>
+												Edit
+											</Text>
+										</TouchableOpacity>
+										<TouchableOpacity
+											style={[styles.qrButton, styles.qrButtonPrimary]}
+											onPress={shareQRCode}
+										>
+											<Ionicons name='share' size={16} color='#ffffff' />
+											<Text
+												style={[
+													styles.qrButtonText,
+													styles.qrButtonTextPrimary,
+												]}
+											>
+												Share
+											</Text>
+										</TouchableOpacity>
+									</View>
+								</View>
+							) : isFormValid ? (
+								<TouchableOpacity
+									style={styles.generateQRButton}
+									onPress={generateQRCode}
+								>
+									<Text style={styles.generateQRButtonText}>
+										Generate QR Code
+									</Text>
+								</TouchableOpacity>
+							) : null}
+
+							{/* Send Button */}
+							<TouchableOpacity
+								style={[
+									styles.sendButton,
+									!isFormValid && styles.sendButtonDisabled,
+								]}
+								onPress={handleSendRequest}
+								disabled={!isFormValid}
+							>
+								{isLoading ? (
+									<ActivityIndicator color='#ffffff' />
+								) : (
+									<>
+										<Text
+											style={[
+												styles.sendButtonText,
+												!isFormValid && styles.sendButtonTextDisabled,
+											]}
+										>
+											{showQR
+												? 'Send Request & QR Code'
+												: 'Send Payment Request'}
+										</Text>
+									</>
+								)}
+							</TouchableOpacity>
+						</ScrollView>
+					</KeyboardAvoidingView>
 				</View>
 			</View>
 		</Modal>
