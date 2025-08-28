@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -9,12 +9,24 @@ import {
 	ActivityIndicator,
 	Modal,
 	ScrollView,
+	Platform,
 } from 'react-native';
 import { Wallet } from '@dynamic-labs/client';
 import { walletService, Transaction } from '../services/walletService';
 import { client } from '../lib/client';
 import { parseEther } from 'viem';
 import { seiTestnet } from 'viem/chains';
+
+// Web polyfills
+if (Platform.OS === 'web') {
+	// Ensure global objects exist for web
+	if (typeof global === 'undefined') {
+		(window as any).global = window;
+	}
+	if (typeof process === 'undefined') {
+		(window as any).process = { env: {} };
+	}
+}
 
 interface SendPaymentProps {
 	wallet: Wallet;
@@ -36,6 +48,33 @@ export const SendPayment: React.FC<SendPaymentProps> = ({
 		address?: string;
 		amount?: string;
 	}>({});
+	const [walletReady, setWalletReady] = useState(false);
+
+	// Check if wallet is ready for web
+	useEffect(() => {
+		if (Platform.OS === 'web') {
+			const checkWallet = async () => {
+				try {
+					// Wait for client to be ready
+					if (client.wallets.primary) {
+						setWalletReady(true);
+					} else {
+						// Wait a bit for wallet to connect
+						setTimeout(() => {
+							if (client.wallets.primary) {
+								setWalletReady(true);
+							}
+						}, 1000);
+					}
+				} catch (error) {
+					console.error('Wallet check failed:', error);
+				}
+			};
+			checkWallet();
+		} else {
+			setWalletReady(true);
+		}
+	}, [wallet]);
 
 	const validateForm = useCallback(() => {
 		const newErrors: { address?: string; amount?: string } = {};
@@ -67,68 +106,123 @@ export const SendPayment: React.FC<SendPaymentProps> = ({
 		return Object.keys(newErrors).length === 0;
 	}, [recipientAddress, amount, wallet.address]);
 
+	// Web-compatible confirmation dialog
+	const showConfirmationDialog = useCallback(
+		(message: string): Promise<boolean> => {
+			return new Promise((resolve) => {
+				if (Platform.OS === 'web') {
+					// Use browser's native confirm dialog for web
+					const confirmed = window.confirm(message);
+					resolve(confirmed);
+				} else {
+					// Use React Native Alert for mobile
+					Alert.alert(
+						'Confirm Transaction',
+						message,
+						[
+							{
+								text: 'Cancel',
+								style: 'cancel',
+								onPress: () => resolve(false),
+							},
+							{
+								text: 'Send',
+								style: 'default',
+								onPress: () => resolve(true),
+							},
+						],
+						{ cancelable: true }
+					);
+				}
+			});
+		},
+		[]
+	);
+
+	// Web-compatible error alert
+	const showErrorAlert = useCallback((title: string, message: string) => {
+		if (Platform.OS === 'web') {
+			// Use browser's native alert for web
+			alert(`${title}: ${message}`);
+		} else {
+			// Use React Native Alert for mobile
+			Alert.alert(title, message, [{ text: 'OK' }]);
+		}
+	}, []);
+
 	const handleSend = useCallback(async () => {
 		if (!validateForm()) {
 			return;
 		}
 
+		// Check if wallet is properly connected
+		if (!wallet || !wallet.address) {
+			showErrorAlert('Wallet Error', 'Please connect your wallet first');
+			return;
+		}
+
 		// Show confirmation dialog first, BEFORE setting loading state
-		Alert.alert(
-			'Confirm Transaction',
-			`Send ${amount} ETH to ${recipientAddress.slice(0, 6)}...${recipientAddress.slice(-4)}?`,
-			[
-				{
-					text: 'Cancel',
-					style: 'cancel',
-					onPress: () => {
-						// Don't set loading state if cancelled
-					},
-				},
-				{
-					text: 'Send',
-					style: 'default',
-					onPress: async () => {
-						try {
-							setIsLoading(true);
-							console.log('wallet: ', wallet);
-							const walletClient = await client.viem.createWalletClient({
-								chain: seiTestnet,
-								wallet: client.wallets.primary!,
-							});
+		const message = `Send ${amount} ETH to ${recipientAddress.slice(0, 6)}...${recipientAddress.slice(-4)}?`;
+		const confirmed = await showConfirmationDialog(message);
 
-							console.log('walletClient: ', walletClient);
-							const amountWei = parseEther(amount);
+		if (!confirmed) {
+			return;
+		}
 
-							console.log('amountWei: ', amountWei);
-							const transaction = await walletClient.sendTransaction({
-								to: recipientAddress as `0x${string}`,
-								value: amountWei,
-							});
+		try {
+			setIsLoading(true);
+			console.log('wallet: ', wallet);
 
-							console.log('Transaction: ', transaction);
+			// Check if we're in web environment and handle accordingly
+			if (Platform.OS === 'web') {
+				// For web, ensure wallet is connected and ready
+				if (!client.wallets.primary) {
+					throw new Error(
+						'No primary wallet found. Please connect your wallet.'
+					);
+				}
+			}
 
-							// Reset form
-							setRecipientAddress('');
-							setAmount('');
-							setErrors({});
-							onClose();
-						} catch (error) {
-							console.error('Transaction failed:', error);
-							Alert.alert(
-								'Transaction Failed',
-								error instanceof Error
-									? error.message
-									: 'Unknown error occurred',
-								[{ text: 'OK' }]
-							);
-						} finally {
-							setIsLoading(false);
-						}
-					},
-				},
-			],
-			{ cancelable: true } // Allow dismissing by tapping outside
-		);
+			const walletClient = await client.viem.createWalletClient({
+				chain: seiTestnet,
+				wallet: client.wallets.primary!,
+			});
+
+			console.log('walletClient: ', walletClient);
+			const amountWei = parseEther(amount);
+
+			console.log('amountWei: ', amountWei);
+
+			// Check if wallet client is properly initialized
+			if (!walletClient) {
+				throw new Error('Failed to initialize wallet client');
+			}
+
+			const transaction = await walletClient.sendTransaction({
+				to: recipientAddress as `0x${string}`,
+				value: amountWei,
+			});
+
+			console.log('Transaction: ', transaction);
+
+			// Reset form
+			setRecipientAddress('');
+			setAmount('');
+			setErrors({});
+			onClose();
+
+			// Show success message
+			if (Platform.OS === 'web') {
+				alert(`Transaction sent successfully! Hash: ${transaction}`);
+			}
+		} catch (error) {
+			console.error('Transaction failed:', error);
+			const errorMessage =
+				error instanceof Error ? error.message : 'Unknown error occurred';
+			showErrorAlert('Transaction Failed', errorMessage);
+		} finally {
+			setIsLoading(false);
+		}
 	}, [
 		validateForm,
 		amount,
@@ -136,6 +230,8 @@ export const SendPayment: React.FC<SendPaymentProps> = ({
 		wallet,
 		onTransactionComplete,
 		onClose,
+		showConfirmationDialog,
+		showErrorAlert,
 	]);
 
 	const handleClose = useCallback(() => {

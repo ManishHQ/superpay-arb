@@ -9,7 +9,10 @@ export default function AppLayout() {
 			<Stack>
 				<Stack.Screen name='index' />
 				<Stack.Screen name='login/index' />
-				<Stack.Screen name='(tabs)/home/index' />
+				<Stack.Screen
+					name='(tabs)/home/index'
+					options={{ headerShown: false }}
+				/>
 			</Stack>
 		</>
 	);

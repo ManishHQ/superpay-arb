@@ -1,0 +1,1040 @@
+import React from 'react';
+import {
+	Button,
+	TextInput,
+	Text,
+	View,
+	Alert,
+	Modal,
+	Share,
+	Platform,
+} from 'react-native';
+import {
+	GestureHandlerRootView,
+	ScrollView,
+} from 'react-native-gesture-handler';
+import { Card } from 'react-native-paper';
+import { ethers } from 'ethers';
+import { styles } from '../../styles/styles';
+import { MOCKUSDC_CONFIG } from '../../constants/mUSDC';
+import QRCode from 'react-native-qrcode-svg';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { MagicService } from '@/hooks/magic';
+
+// Import services
+import {
+	WalletService,
+	USDCService,
+	QRService,
+	TransactionService,
+	type PaymentRequestData,
+} from '../../services';
+
+export default function Web3Screen() {
+	const [publicAddress, updatePublicAddress] = React.useState('');
+	const [ethBalance, setEthBalance] = React.useState('');
+	const [usdcBalance, setUsdcBalance] = React.useState('');
+	const [toAddress, onChangeToAddress] = React.useState('');
+	const [transferAmount, setTransferAmount] = React.useState('');
+	const [transactionHash, updateTransactionHash] = React.useState('');
+	const [isLoading, setIsLoading] = React.useState(false);
+
+	// QR Code States
+	const [showQRModal, setShowQRModal] = React.useState(false);
+	const [qrPaymentRequest, setQrPaymentRequest] = React.useState('');
+	const [requestAmount, setRequestAmount] = React.useState('');
+	const [qrDescription, setQrDescription] = React.useState('');
+
+	// QR Scanner States
+	const [showScanner, setShowScanner] = React.useState(false);
+	const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+	const [scanned, setScanned] = React.useState(false);
+
+	// QR Payment Confirmation States
+	const [showPaymentConfirmation, setShowPaymentConfirmation] =
+		React.useState(false);
+	const [scannedPaymentData, setScannedPaymentData] =
+		React.useState<PaymentRequestData | null>(null);
+
+	const magic = MagicService.magic;
+	const provider = MagicService.provider;
+
+	/** Generate Payment Request QR Code */
+	const generatePaymentQR = () => {
+		if (!publicAddress) {
+			Alert.alert('Error', 'Please connect your wallet first');
+			return;
+		}
+
+		if (!requestAmount || parseFloat(requestAmount) <= 0) {
+			Alert.alert('Error', 'Please enter a valid amount');
+			return;
+		}
+
+		// Generate QR data using service
+		const qrData = QRService.generatePaymentRequest(
+			publicAddress,
+			requestAmount,
+			qrDescription
+		);
+
+		setQrPaymentRequest(qrData);
+		setShowQRModal(true);
+	};
+
+	/** Share Payment QR */
+	const sharePaymentQR = async () => {
+		try {
+			const success = await QRService.sharePaymentRequest(
+				requestAmount,
+				publicAddress,
+				qrDescription
+			);
+			if (success) {
+				console.log('Payment request shared successfully');
+			}
+		} catch (error) {
+			console.error('Error sharing payment request:', error);
+			Alert.alert('Error', 'Failed to share payment request');
+		}
+	};
+
+	/** Parse QR Code Data */
+	const parseQRData = (qrData: string) => {
+		const paymentData = QRService.parsePaymentRequest(qrData);
+
+		if (paymentData) {
+			const validation = QRService.validatePaymentRequest(paymentData);
+			if (validation.isValid) {
+				setScannedPaymentData(paymentData);
+				setShowPaymentConfirmation(true);
+			} else {
+				Alert.alert(
+					'Invalid QR Code',
+					validation.error || 'Invalid payment request'
+				);
+			}
+		} else {
+			Alert.alert(
+				'Invalid QR Code',
+				'This QR code is not a valid payment request'
+			);
+		}
+	};
+
+	/** Confirm Scanned Payment */
+	const confirmScannedPayment = async () => {
+		if (!scannedPaymentData) return;
+
+		setIsLoading(true);
+		try {
+			// Use TransactionService to handle the QR payment
+			const result = await TransactionService.executeQRPayment(
+				scannedPaymentData,
+				publicAddress,
+				usdcBalance
+			);
+
+			updateTransactionHash(result.txHash || '');
+
+			// Close confirmation modal
+			setShowPaymentConfirmation(false);
+			setScannedPaymentData(null);
+
+			if (result.success) {
+				const messages = TransactionService.getTransactionMessages(
+					result,
+					scannedPaymentData.amount,
+					scannedPaymentData.to,
+					scannedPaymentData.description
+				);
+
+				Alert.alert('Transaction Sent', messages.sentMessage);
+
+				// Show success message after confirmation
+				setTimeout(() => {
+					Alert.alert('Payment Successful! 🎉', messages.successMessage);
+				}, 1000);
+
+				// Refresh balances after successful transaction
+				await getBalance();
+			} else {
+				Alert.alert('Payment Error', result.error || 'Payment failed');
+			}
+		} catch (error: any) {
+			console.error('QR Payment error:', error);
+			Alert.alert('Payment Error', error.message || 'Payment failed');
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	/** Cancel Scanned Payment */
+	const cancelScannedPayment = () => {
+		setShowPaymentConfirmation(false);
+		setScannedPaymentData(null);
+	};
+
+	/** Open QR Scanner */
+	const openQRScanner = async () => {
+		if (!cameraPermission) {
+			Alert.alert('Error', 'Camera permissions are loading...');
+			return;
+		}
+
+		if (!cameraPermission.granted) {
+			const { granted } = await requestCameraPermission();
+			if (!granted) {
+				Alert.alert(
+					'Camera Permission Required',
+					'Please enable camera access to scan QR codes'
+				);
+				return;
+			}
+		}
+
+		setScanned(false);
+		setShowScanner(true);
+	};
+
+	/** Handle Barcode Scanned */
+	const handleBarcodeScanned = async ({ data }: { data: string }) => {
+		if (scanned) return; // Prevent multiple scans
+
+		setScanned(true);
+		setShowScanner(false);
+
+		console.log('QR Code scanned:', data);
+
+		// Parse the scanned QR code data
+		parseQRData(data);
+	};
+
+	/** Get Account and Balances */
+	const getAccount = async () => {
+		setIsLoading(true);
+		try {
+			// Use WalletService to get account info
+			const accountInfo = await WalletService.getAccountInfo();
+			updatePublicAddress(accountInfo.address);
+			setEthBalance(accountInfo.ethBalance);
+			console.log('address', accountInfo.address);
+
+			// Get MockUSDC balance using USDCService
+			const usdcBalanceFormatted = await USDCService.getBalance(
+				accountInfo.address
+			);
+			setUsdcBalance(usdcBalanceFormatted);
+		} catch (e) {
+			console.error(e);
+			updatePublicAddress('');
+			setEthBalance('');
+			setUsdcBalance('');
+			Alert.alert('Error', 'Failed to get account information');
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	/** Get Balance (refresh) */
+	const getBalance = async () => {
+		if (!publicAddress) {
+			Alert.alert('Error', 'Please get account first');
+			return;
+		}
+
+		setIsLoading(true);
+		try {
+			// Get ETH balance using WalletService
+			const ethBalanceFormatted = await WalletService.getEthBalance(
+				publicAddress
+			);
+			setEthBalance(ethBalanceFormatted);
+
+			// Get MockUSDC balance using USDCService
+			const usdcBalanceFormatted = await USDCService.getBalance(publicAddress);
+			setUsdcBalance(usdcBalanceFormatted);
+		} catch (e) {
+			console.error(e);
+			Alert.alert('Error', (e as Error).message);
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	/** Use MockUSDC Faucet */
+	const useFaucet = async () => {
+		if (!publicAddress) {
+			Alert.alert('Error', 'Please connect account first');
+			return;
+		}
+
+		setIsLoading(true);
+		try {
+			// Use TransactionService to handle faucet
+			const result = await TransactionService.useFaucet(publicAddress);
+
+			if (result.success) {
+				updateTransactionHash(result.txHash || '');
+
+				Alert.alert(
+					'Faucet Transaction Sent',
+					`Getting 1000 ${MOCKUSDC_CONFIG.symbol}...\nTx: ${result.txHash}`
+				);
+
+				console.log('Waiting for faucet confirmation...');
+
+				Alert.alert(
+					'Success!',
+					`Received 1000 ${MOCKUSDC_CONFIG.symbol}!\nBlock: ${result.receipt?.blockNumber}`
+				);
+
+				// Refresh balance after faucet
+				await getBalance();
+			} else {
+				Alert.alert('Faucet Error', result.error || 'Faucet failed');
+			}
+		} catch (error: any) {
+			console.error('Faucet error:', error);
+			Alert.alert('Faucet Error', error.message || 'Faucet failed');
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	/** Personal Sign */
+	const personalSign = async () => {
+		try {
+			const signature = await WalletService.personalSign();
+			Alert.alert('Signature', signature);
+		} catch (err) {
+			console.error(err);
+			Alert.alert('Error', (err as Error).message);
+		}
+	};
+
+	/** Show Magic Wallet */
+	const showWallet = async () => {
+		try {
+			await WalletService.showWallet();
+		} catch (e) {
+			Alert.alert('Error', (e as Error).message);
+		}
+	};
+
+	/** Get Wallet Info */
+	const getWalletInfo = async () => {
+		try {
+			const walletInfo = await WalletService.getWalletInfo();
+			Alert.alert(
+				'Wallet Info',
+				`Type: ${walletInfo.walletType}\nEmail: ${walletInfo.email}`
+			);
+		} catch (e) {
+			Alert.alert('Error', (e as Error).message);
+		}
+	};
+
+	/** Send USDC Transaction */
+	const sendTransaction = async () => {
+		setIsLoading(true);
+		try {
+			// Use TransactionService to handle the transfer
+			const result = await TransactionService.executeTransfer(
+				toAddress,
+				transferAmount,
+				publicAddress,
+				usdcBalance
+			);
+
+			if (result.success) {
+				updateTransactionHash(result.txHash || '');
+
+				const messages = TransactionService.getTransactionMessages(
+					result,
+					transferAmount,
+					toAddress
+				);
+
+				Alert.alert('Transaction Sent', messages.sentMessage);
+
+				// Wait for confirmation and show success
+				setTimeout(() => {
+					Alert.alert('Transfer Successful!', messages.successMessage);
+				}, 1000);
+
+				// Refresh balances after successful transaction
+				await getBalance();
+
+				// Clear form
+				setTransferAmount('');
+				onChangeToAddress('');
+			} else {
+				Alert.alert('Transaction Error', result.error || 'Transaction failed');
+			}
+		} catch (error: any) {
+			console.error('Transaction error:', error);
+			Alert.alert('Transaction Error', error.message || 'Transaction failed');
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	return (
+		<View style={styles.container}>
+			<GestureHandlerRootView style={{ flex: 1 }}>
+				<ScrollView
+					style={styles.container}
+					contentContainerStyle={styles.contentContainer}
+				>
+					{/* Send MockUSDC Transaction */}
+					<Card>
+						<Card.Title title={`Send ${MOCKUSDC_CONFIG.symbol}`} />
+						<View style={styles.loginContainer}>
+							<Text>To:</Text>
+							<TextInput
+								style={styles.TextInputContainer}
+								onChangeText={onChangeToAddress}
+								value={toAddress}
+								placeholder='0x... (Enter valid Ethereum address)'
+								editable={!isLoading}
+							/>
+							<Text>Amount ({MOCKUSDC_CONFIG.symbol}):</Text>
+							<TextInput
+								style={styles.TextInputContainer}
+								onChangeText={setTransferAmount}
+								value={transferAmount}
+								placeholder={`Enter ${MOCKUSDC_CONFIG.symbol} amount`}
+								keyboardType='numeric'
+								editable={!isLoading}
+							/>
+							<Text style={styles.publicAddress}>
+								Transaction Hash: {transactionHash}
+							</Text>
+						</View>
+						<View style={styles.actionContainer}>
+							<Button
+								onPress={sendTransaction}
+								title={
+									isLoading ? 'Sending...' : `Send ${MOCKUSDC_CONFIG.symbol}`
+								}
+								disabled={isLoading}
+							/>
+							<Button
+								onPress={openQRScanner}
+								title='📷 Scan QR'
+								disabled={isLoading}
+							/>
+						</View>
+					</Card>
+
+					{/* QR Payment Request */}
+					<Card>
+						<Card.Title title='📱 QR Payment Request' />
+						<View style={styles.loginContainer}>
+							<Text>Request Amount ({MOCKUSDC_CONFIG.symbol}):</Text>
+							<TextInput
+								style={styles.TextInputContainer}
+								onChangeText={setRequestAmount}
+								value={requestAmount}
+								placeholder={`Enter ${MOCKUSDC_CONFIG.symbol} amount to request`}
+								keyboardType='numeric'
+								editable={!isLoading}
+							/>
+							<Text>Description (optional):</Text>
+							<TextInput
+								style={styles.TextInputContainer}
+								onChangeText={setQrDescription}
+								value={qrDescription}
+								placeholder='Payment description'
+								editable={!isLoading}
+							/>
+							<Text
+								style={[styles.publicAddress, { fontSize: 12, opacity: 0.7 }]}
+							>
+								Generate a QR code for others to scan and pay you
+							</Text>
+						</View>
+						<View style={styles.actionContainer}>
+							<Button
+								onPress={generatePaymentQR}
+								title={isLoading ? 'Generating...' : '📱 Generate QR Code'}
+								disabled={isLoading || !publicAddress}
+							/>
+						</View>
+					</Card>
+
+					{/* Get Account & Balance */}
+					<Card>
+						<Card.Title title='Account & Balances' />
+						<View style={styles.loginContainer}>
+							<Text style={styles.publicAddress}>
+								Public Address: {publicAddress || 'Not connected'}
+							</Text>
+							<Text style={styles.publicAddress}>
+								ETH Balance: {ethBalance} ETH (for gas)
+							</Text>
+							<Text style={styles.publicAddress}>
+								{MOCKUSDC_CONFIG.symbol} Balance: {usdcBalance}{' '}
+								{MOCKUSDC_CONFIG.symbol}
+							</Text>
+							<Text
+								style={[styles.publicAddress, { fontSize: 12, opacity: 0.7 }]}
+							>
+								Network: Morph Testnet
+							</Text>
+						</View>
+						<View style={styles.actionContainer}>
+							<Button
+								onPress={getAccount}
+								title={isLoading ? 'Loading...' : 'Get Account & Balance'}
+								disabled={isLoading}
+							/>
+							<Button
+								onPress={getBalance}
+								title={isLoading ? 'Refreshing...' : 'Refresh Balance'}
+								disabled={isLoading}
+							/>
+						</View>
+					</Card>
+
+					{/* MockUSDC Faucet */}
+					<Card>
+						<Card.Title title={`Get Test ${MOCKUSDC_CONFIG.symbol}`} />
+						<View style={styles.loginContainer}>
+							<Text>Get free MockUSDC tokens for testing</Text>
+							<Text style={[styles.publicAddress, { fontSize: 12 }]}>
+								Faucet gives 1000 {MOCKUSDC_CONFIG.symbol} per use
+							</Text>
+						</View>
+						<View style={styles.actionContainer}>
+							<Button
+								onPress={useFaucet}
+								title={
+									isLoading
+										? 'Getting Tokens...'
+										: `Get 1000 ${MOCKUSDC_CONFIG.symbol}`
+								}
+								disabled={isLoading || !publicAddress}
+							/>
+						</View>
+					</Card>
+
+					{/* Wallet Actions */}
+					<Card>
+						<Card.Title title='Wallet Actions' />
+						<View style={styles.actionContainer}>
+							<Button onPress={personalSign} title='Personal Sign' />
+							<Button onPress={showWallet} title='Show Magic Wallet' />
+							<Button onPress={getWalletInfo} title='Wallet Info' />
+						</View>
+					</Card>
+
+					{/* Contract Info */}
+					<Card>
+						<Card.Title title='Contract Information' />
+						<View style={styles.loginContainer}>
+							<Text style={[styles.publicAddress, { fontSize: 12 }]}>
+								Contract: {MOCKUSDC_CONFIG.address}
+							</Text>
+							<Text style={[styles.publicAddress, { fontSize: 12 }]}>
+								Symbol: {MOCKUSDC_CONFIG.symbol}
+							</Text>
+							<Text style={[styles.publicAddress, { fontSize: 12 }]}>
+								Decimals: {MOCKUSDC_CONFIG.decimals}
+							</Text>
+							<Text style={[styles.publicAddress, { fontSize: 12 }]}>
+								Chain ID: 2810 (Morph Testnet)
+							</Text>
+						</View>
+					</Card>
+				</ScrollView>
+			</GestureHandlerRootView>
+
+			{/* QR Payment Modal */}
+			<Modal
+				visible={showQRModal}
+				transparent={true}
+				animationType='slide'
+				onRequestClose={() => setShowQRModal(false)}
+			>
+				<View
+					style={{
+						flex: 1,
+						backgroundColor: 'rgba(0,0,0,0.5)',
+						justifyContent: 'center',
+						alignItems: 'center',
+						padding: 20,
+					}}
+				>
+					<View
+						style={{
+							backgroundColor: 'white',
+							borderRadius: 20,
+							padding: 30,
+							alignItems: 'center',
+							shadowColor: '#000',
+							shadowOffset: { width: 0, height: 2 },
+							shadowOpacity: 0.25,
+							shadowRadius: 4,
+							elevation: 5,
+							minWidth: 300,
+							maxWidth: '90%',
+							maxHeight: '80%',
+						}}
+					>
+						<Text
+							style={{
+								fontSize: 20,
+								fontWeight: 'bold',
+								marginBottom: 10,
+								textAlign: 'center',
+							}}
+						>
+							💰 Payment Request
+						</Text>
+
+						<Text
+							style={{
+								fontSize: 16,
+								marginBottom: 5,
+								color: '#666',
+							}}
+						>
+							Amount: {requestAmount} {MOCKUSDC_CONFIG.symbol}
+						</Text>
+
+						{qrDescription && (
+							<Text
+								style={{
+									fontSize: 14,
+									marginBottom: 15,
+									color: '#888',
+									textAlign: 'center',
+								}}
+							>
+								{qrDescription}
+							</Text>
+						)}
+
+						{/* QR Code */}
+						<View
+							style={{
+								padding: 20,
+								backgroundColor: '#f8f9fa',
+								borderRadius: 15,
+								marginBottom: 20,
+							}}
+						>
+							<QRCode
+								value={qrPaymentRequest}
+								size={200}
+								color='#2563eb'
+								backgroundColor='white'
+								logo={require('../../assets/images/icon.png')}
+								logoSize={30}
+								logoBackgroundColor='transparent'
+								enableLinearGradient={true}
+								linearGradient={['#6366f1', '#8b5cf6']}
+								ecl='M'
+							/>
+						</View>
+
+						<Text
+							style={{
+								fontSize: 12,
+								color: '#888',
+								textAlign: 'center',
+								marginBottom: 20,
+							}}
+						>
+							Scan this QR code to pay {requestAmount} {MOCKUSDC_CONFIG.symbol}
+						</Text>
+
+						<View
+							style={{
+								flexDirection: 'row',
+								justifyContent: 'space-around',
+								width: '100%',
+							}}
+						>
+							<Button title='📤 Share' onPress={sharePaymentQR} />
+							<Button title='❌ Close' onPress={() => setShowQRModal(false)} />
+						</View>
+					</View>
+				</View>
+			</Modal>
+
+			{/* QR Scanner Modal */}
+			<Modal
+				visible={showScanner}
+				transparent={false}
+				animationType='slide'
+				onRequestClose={() => setShowScanner(false)}
+			>
+				<View style={{ flex: 1, backgroundColor: 'black' }}>
+					{/* Header */}
+					<View
+						style={{
+							position: 'absolute',
+							top: 50,
+							left: 0,
+							right: 0,
+							zIndex: 10,
+							paddingHorizontal: 20,
+							paddingVertical: 15,
+						}}
+					>
+						<View
+							style={{
+								flexDirection: 'row',
+								justifyContent: 'space-between',
+								alignItems: 'center',
+							}}
+						>
+							<Text
+								style={{
+									color: 'white',
+									fontSize: 20,
+									fontWeight: 'bold',
+								}}
+							>
+								📷 Scan QR Code
+							</Text>
+							<Button title='❌ Close' onPress={() => setShowScanner(false)} />
+						</View>
+					</View>
+
+					{/* Camera View */}
+					<CameraView
+						style={{ flex: 1 }}
+						facing='back'
+						onBarcodeScanned={handleBarcodeScanned}
+						barcodeScannerSettings={{
+							barcodeTypes: ['qr'],
+						}}
+					>
+						{/* Scanning Overlay */}
+						<View
+							style={{
+								flex: 1,
+								justifyContent: 'center',
+								alignItems: 'center',
+							}}
+						>
+							{/* Scanning Frame */}
+							<View
+								style={{
+									width: 250,
+									height: 250,
+									borderWidth: 2,
+									borderColor: 'white',
+									borderRadius: 20,
+									backgroundColor: 'transparent',
+									position: 'relative',
+								}}
+							>
+								{/* Corner indicators */}
+								<View
+									style={{
+										position: 'absolute',
+										top: -2,
+										left: -2,
+										width: 30,
+										height: 30,
+										borderTopWidth: 4,
+										borderLeftWidth: 4,
+										borderColor: '#6366f1',
+										borderTopLeftRadius: 20,
+									}}
+								/>
+								<View
+									style={{
+										position: 'absolute',
+										top: -2,
+										right: -2,
+										width: 30,
+										height: 30,
+										borderTopWidth: 4,
+										borderRightWidth: 4,
+										borderColor: '#6366f1',
+										borderTopRightRadius: 20,
+									}}
+								/>
+								<View
+									style={{
+										position: 'absolute',
+										bottom: -2,
+										left: -2,
+										width: 30,
+										height: 30,
+										borderBottomWidth: 4,
+										borderLeftWidth: 4,
+										borderColor: '#6366f1',
+										borderBottomLeftRadius: 20,
+									}}
+								/>
+								<View
+									style={{
+										position: 'absolute',
+										bottom: -2,
+										right: -2,
+										width: 30,
+										height: 30,
+										borderBottomWidth: 4,
+										borderRightWidth: 4,
+										borderColor: '#6366f1',
+										borderBottomRightRadius: 20,
+									}}
+								/>
+							</View>
+
+							{/* Instructions */}
+							<Text
+								style={{
+									color: 'white',
+									fontSize: 16,
+									textAlign: 'center',
+									marginTop: 30,
+									paddingHorizontal: 40,
+								}}
+							>
+								Position the QR code within the frame to scan
+							</Text>
+
+							{scanned && (
+								<Text
+									style={{
+										color: '#4ade80',
+										fontSize: 14,
+										textAlign: 'center',
+										marginTop: 10,
+									}}
+								>
+									✅ QR Code Scanned!
+								</Text>
+							)}
+						</View>
+					</CameraView>
+				</View>
+			</Modal>
+
+			{/* Payment Confirmation Modal */}
+			<Modal
+				visible={showPaymentConfirmation}
+				transparent={true}
+				animationType='slide'
+				onRequestClose={() => setShowPaymentConfirmation(false)}
+			>
+				<View
+					style={{
+						flex: 1,
+						backgroundColor: 'rgba(0,0,0,0.5)',
+						justifyContent: 'center',
+						alignItems: 'center',
+						padding: 20,
+					}}
+				>
+					<View
+						style={{
+							backgroundColor: 'white',
+							borderRadius: 20,
+							padding: 30,
+							alignItems: 'center',
+							shadowColor: '#000',
+							shadowOffset: { width: 0, height: 2 },
+							shadowOpacity: 0.25,
+							shadowRadius: 4,
+							elevation: 5,
+							minWidth: 300,
+						}}
+					>
+						<Text
+							style={{
+								fontSize: 20,
+								fontWeight: 'bold',
+								marginBottom: 20,
+								textAlign: 'center',
+							}}
+						>
+							💰 Payment Request Confirmation
+						</Text>
+
+						{/* Payment Details Form */}
+						<View style={{ width: '100%', marginBottom: 20 }}>
+							<Text
+								style={{
+									fontSize: 14,
+									fontWeight: 'bold',
+									marginBottom: 5,
+									color: '#333',
+								}}
+							>
+								To Address:
+							</Text>
+							<TextInput
+								style={[
+									styles.TextInputContainer,
+									{ backgroundColor: '#f5f5f5', color: '#666' },
+								]}
+								value={scannedPaymentData?.to || ''}
+								editable={false}
+								multiline={true}
+							/>
+
+							<Text
+								style={{
+									fontSize: 14,
+									fontWeight: 'bold',
+									marginBottom: 5,
+									marginTop: 15,
+									color: '#333',
+								}}
+							>
+								Amount:
+							</Text>
+							<TextInput
+								style={[
+									styles.TextInputContainer,
+									{ backgroundColor: '#f5f5f5', color: '#666' },
+								]}
+								value={`${scannedPaymentData?.amount || ''} ${
+									scannedPaymentData?.token || ''
+								}`}
+								editable={false}
+							/>
+
+							<Text
+								style={{
+									fontSize: 14,
+									fontWeight: 'bold',
+									marginBottom: 5,
+									marginTop: 15,
+									color: '#333',
+								}}
+							>
+								Token Contract:
+							</Text>
+							<TextInput
+								style={[
+									styles.TextInputContainer,
+									{ backgroundColor: '#f5f5f5', color: '#666' },
+								]}
+								value={scannedPaymentData?.contract || ''}
+								editable={false}
+								multiline={true}
+							/>
+
+							{scannedPaymentData?.description && (
+								<>
+									<Text
+										style={{
+											fontSize: 14,
+											fontWeight: 'bold',
+											marginBottom: 5,
+											marginTop: 15,
+											color: '#333',
+										}}
+									>
+										Description:
+									</Text>
+									<TextInput
+										style={[
+											styles.TextInputContainer,
+											{ backgroundColor: '#f5f5f5', color: '#666' },
+										]}
+										value={scannedPaymentData.description}
+										editable={false}
+										multiline={true}
+									/>
+								</>
+							)}
+
+							<Text
+								style={{
+									fontSize: 14,
+									fontWeight: 'bold',
+									marginBottom: 5,
+									marginTop: 15,
+									color: '#333',
+								}}
+							>
+								Chain ID:
+							</Text>
+							<TextInput
+								style={[
+									styles.TextInputContainer,
+									{ backgroundColor: '#f5f5f5', color: '#666' },
+								]}
+								value={`${scannedPaymentData?.chainId || ''} (Morph Testnet)`}
+								editable={false}
+							/>
+
+							<Text
+								style={{
+									fontSize: 14,
+									fontWeight: 'bold',
+									marginBottom: 5,
+									marginTop: 15,
+									color: '#333',
+								}}
+							>
+								Your Current Balance:
+							</Text>
+							<TextInput
+								style={[
+									styles.TextInputContainer,
+									{
+										backgroundColor:
+											parseFloat(scannedPaymentData?.amount || '0') >
+											parseFloat(usdcBalance)
+												? '#fee2e2'
+												: '#f0f9ff',
+										color:
+											parseFloat(scannedPaymentData?.amount || '0') >
+											parseFloat(usdcBalance)
+												? '#dc2626'
+												: '#1e40af',
+									},
+								]}
+								value={`${usdcBalance} ${MOCKUSDC_CONFIG.symbol}`}
+								editable={false}
+							/>
+						</View>
+
+						<Text
+							style={{
+								fontSize: 12,
+								color: '#888',
+								textAlign: 'center',
+								marginBottom: 20,
+							}}
+						>
+							Review the payment details above. Tap "Confirm & Pay" to execute
+							the transaction immediately.
+						</Text>
+
+						<View
+							style={{
+								flexDirection: 'row',
+								justifyContent: 'space-around',
+								width: '100%',
+							}}
+						>
+							<Button
+								title={isLoading ? '⏳ Processing...' : '✅ Confirm & Pay'}
+								onPress={confirmScannedPayment}
+								disabled={isLoading}
+							/>
+							<Button
+								title='❌ Cancel'
+								onPress={cancelScannedPayment}
+								disabled={isLoading}
+							/>
+						</View>
+					</View>
+				</View>
+			</Modal>
+		</View>
+	);
+}

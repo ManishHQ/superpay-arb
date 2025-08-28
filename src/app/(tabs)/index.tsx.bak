@@ -1,0 +1,221 @@
+import React from 'react';
+import { TextInput, Text, View, Pressable, Alert } from 'react-native';
+import {
+	GestureHandlerRootView,
+	ScrollView,
+} from 'react-native-gesture-handler';
+import { styles } from '../../styles/styles';
+import { Card } from 'react-native-paper';
+import OnboardingFlow from '@/components/OnboardingFlow';
+import UserSearch from '@/components/UserSearch';
+import {
+	AuthService,
+	type UserProfile,
+	UIService,
+	type UIState,
+	type UIHandlers,
+	FormService,
+	type FormState,
+	type FormHandlers,
+} from '@/services';
+import { MagicService } from '@/hooks/magic';
+
+export default function LoginScreen() {
+	// Form state
+	const [formState, setFormState] = React.useState<FormState>(
+		FormService.getDefaultFormState()
+	);
+
+	// UI state
+	const [uiState, setUIState] = React.useState<UIState>({
+		showOnboarding: false,
+		showUserSearch: false,
+		userLoggedIn: false,
+		userToken: null,
+	});
+
+	// Form handlers
+	const formHandlers: FormHandlers = {
+		setEmail: (email: string) => setFormState((prev) => ({ ...prev, email })),
+		setRecoveryEmail: (email: string) =>
+			setFormState((prev) => ({ ...prev, recoveryEmail: email })),
+		setPhoneNumber: (phone: string) =>
+			setFormState((prev) => ({ ...prev, phoneNumber: phone })),
+	};
+
+	// UI handlers
+	const uiHandlers: UIHandlers = {
+		setShowOnboarding: (show: boolean) =>
+			setUIState((prev) => ({ ...prev, showOnboarding: show })),
+		setShowUserSearch: (show: boolean) =>
+			setUIState((prev) => ({ ...prev, showUserSearch: show })),
+		setUserLoggedIn: (loggedIn: boolean) =>
+			setUIState((prev) => ({ ...prev, userLoggedIn: loggedIn })),
+		setUserToken: (token: string | null) =>
+			setUIState((prev) => ({ ...prev, userToken: token })),
+	};
+
+	// Authentication handlers using services
+	const handleGoogleSignIn = () => UIService.handleGoogleSignIn();
+	const handleAppleSignIn = () => UIService.handleAppleSignIn();
+	const handleEmailOTPSignIn = () =>
+		UIService.handleEmailOTPSignIn(formState.email);
+	const handleSMSSignIn = () =>
+		UIService.handleSMSSignIn(formState.phoneNumber);
+	const handleShowSettings = () => UIService.handleShowSettings();
+	const handleConnectWithUI = () => UIService.handleConnectWithUI();
+	const handleGetUserInfo = () => UIService.handleGetUserInfo();
+	const handleGetDID = () => UIService.handleGetDID();
+	const handleGetDIDFromUserInfo = () => UIService.handleGetDIDFromUserInfo();
+	const handleCheckLoginStatus = () => UIService.handleCheckLoginStatus();
+	const handleLogout = () => UIService.handleLogout();
+
+	// UI handlers
+	const handleOnboardingComplete = (userData: UserProfile) =>
+		UIService.handleOnboardingComplete(userData, uiHandlers);
+	const startOnboarding = () => UIService.startOnboarding(uiHandlers);
+	const startUserSearch = () => UIService.startUserSearch(uiState, uiHandlers);
+
+	const TouchableButton = (props: { handler: () => void; title: String }) => (
+		<View style={styles.actionContainer}>
+			<Pressable style={styles.button} onPress={() => props.handler()}>
+				<Text style={styles.text}>{props.title}</Text>
+			</Pressable>
+		</View>
+	);
+
+	if (uiState.showOnboarding) {
+		return (
+			<View style={styles.container}>
+				<OnboardingFlow onComplete={handleOnboardingComplete} />
+			</View>
+		);
+	}
+
+	if (uiState.showUserSearch) {
+		return (
+			<View style={styles.container}>
+				<UserSearch
+					token={uiState.userToken!}
+					onBack={() => uiHandlers.setShowUserSearch(false)}
+				/>
+			</View>
+		);
+	}
+
+	return (
+		<View style={styles.container}>
+			<GestureHandlerRootView style={{ flex: 1 }}>
+				<ScrollView
+					style={styles.container}
+					contentContainerStyle={styles.contentContainer}
+					keyboardShouldPersistTaps='handled'
+				>
+					{/* Email Login */}
+					<Card>
+						<Card.Title title='Email OTP Login' />
+						<View style={styles.loginContainer}>
+							<View style={styles.emailContainer}>
+								<Text>Email:</Text>
+								<TextInput
+									style={styles.TextInputContainer}
+									onChangeText={formHandlers.setEmail}
+									value={formState.email}
+								/>
+							</View>
+						</View>
+						<TouchableButton handler={handleEmailOTPSignIn} title='Login' />
+					</Card>
+					{/* Magic Sign-in with SMS */}
+					<Card>
+						<Card.Title title='Login with SMS' />
+						<View style={styles.loginContainer}>
+							<View style={styles.emailContainer}>
+								<Text>Number:</Text>
+								<TextInput
+									style={styles.TextInputContainer}
+									onChangeText={formHandlers.setPhoneNumber}
+									value={formState.phoneNumber}
+								/>
+							</View>
+						</View>
+						<View style={styles.margin10}>
+							<TouchableButton
+								handler={handleSMSSignIn}
+								title='Login with SMS'
+							/>
+						</View>
+					</Card>
+					{/* Google Sign in */}
+					<Card>
+						<Card.Title title='Google Login' />
+						<TouchableButton handler={handleGoogleSignIn} title='Login' />
+					</Card>
+
+					{/* Apple Sign in */}
+					<Card>
+						<Card.Title title='Apple Login' />
+						<TouchableButton handler={handleAppleSignIn} title='Login' />
+					</Card>
+					{/* Check Login Status */}
+					<Card>
+						<Card.Title title='Check Login Status' />
+						<TouchableButton
+							handler={handleCheckLoginStatus}
+							title='Check Status'
+						/>
+					</Card>
+					{/* metaData */}
+					<Card>
+						<Card.Title title='Metadata (getInfo)' />
+						<TouchableButton handler={handleGetUserInfo} title='metadata' />
+					</Card>
+					{/* Get DID */}
+					<Card>
+						<Card.Title title='Get DID' />
+						<TouchableButton handler={handleGetDID} title='Get DID' />
+					</Card>
+					{/* Start Onboarding */}
+					<Card>
+						<Card.Title title='Start Onboarding' />
+						<TouchableButton handler={startOnboarding} title='Begin Setup' />
+					</Card>
+					{/* User Search */}
+					<Card>
+						<Card.Title title='Search Users' />
+						<TouchableButton handler={startUserSearch} title='Search Users' />
+					</Card>
+					{/* Logout */}
+					<Card>
+						<Card.Title title='Logout' />
+						<TouchableButton handler={handleLogout} title='Logout' />
+					</Card>
+					<Card>
+						<Card.Title title='Recover Account' />
+						<View style={styles.emailContainer}>
+							<Text>Email:</Text>
+							<TextInput
+								style={styles.TextInputContainer}
+								onChangeText={formHandlers.setRecoveryEmail}
+								value={formState.recoveryEmail}
+							/>
+						</View>
+						<View style={styles.margin10}>
+							<TouchableButton
+								handler={handleShowSettings}
+								title='Show Settings'
+							/>
+						</View>
+					</Card>
+					<Card>
+						<Card.Title title='Connect With UI' />
+						<TouchableButton
+							handler={handleConnectWithUI}
+							title='Connect With UI'
+						/>
+					</Card>
+				</ScrollView>
+			</GestureHandlerRootView>
+		</View>
+	);
+}

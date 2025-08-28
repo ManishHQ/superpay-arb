@@ -7,6 +7,7 @@ import {
 	View,
 	ScrollView,
 	TouchableOpacity,
+	SafeAreaView,
 } from 'react-native';
 import { client } from '../lib/client';
 import { Wallet } from '@dynamic-labs/client';
@@ -50,7 +51,7 @@ export const DisplayAuthenticatedUserView: FC = () => {
 	);
 
 	return (
-		<View style={styles.container}>
+		<SafeAreaView style={styles.container}>
 			{/* Tab Navigation */}
 			<View style={styles.tabContainer}>
 				{renderTabButton('wallet', 'Wallet', '💳')}
@@ -128,7 +129,7 @@ export const DisplayAuthenticatedUserView: FC = () => {
 					</View>
 				</ScrollView>
 			)}
-		</View>
+		</SafeAreaView>
 	);
 };
 

@@ -18,7 +18,7 @@ export const client = createClient({
 	appLogoUrl: 'https://demo.dynamic.xyz/favicon-32x32.png',
 	appName: 'Dynamic Wallet App',
 })
+	.extend(WebExtension())
 	.extend(ReactNativeExtension())
 	.extend(ViemExtension())
-	.extend(ZeroDevExtension())
-	.extend(WebExtension());
+	.extend(ZeroDevExtension());
