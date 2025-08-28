@@ -2,7 +2,7 @@ import { useReactiveClient } from '@dynamic-labs/react-hooks';
 import { FC } from 'react';
 import { client } from '../lib/client';
 import { LoginView } from '../LoginView';
-import { DisplayAuthenticatedUserView } from '../DisplayAuthenticatedUserView';
+import { DisplayAuthenticatedUserView } from '../DisplayAuthenticatedUserView/index';
 import { Text } from 'react-native';
 
 export const Home: FC = () => {

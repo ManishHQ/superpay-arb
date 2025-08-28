@@ -5,47 +5,36 @@ import {
 	TextInput,
 	TouchableOpacity,
 	ScrollView,
+	Alert,
+	ActivityIndicator,
 } from 'react-native';
 import { BottomSheetModal, BottomSheetView } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Image } from 'expo-image';
 
 // Mock contacts data
-const contacts = [
+const mockContacts = [
 	{
 		id: '1',
-		name: 'Sarah Wilson',
-		avatar: 'https://i.pravatar.cc/150?img=1',
-		phone: '+1 (555) 123-4567',
+		firstName: 'Sarah',
+		lastName: 'Wilson',
+		email: 'sarah.wilson@example.com',
 	},
 	{
 		id: '2',
-		name: 'Mike Chen',
-		avatar: 'https://i.pravatar.cc/150?img=2',
-		phone: '+1 (555) 234-5678',
+		firstName: 'Mike',
+		lastName: 'Chen',
+		email: 'mike.chen@example.com',
 	},
 	{
 		id: '3',
-		name: 'Emma Davis',
-		avatar: 'https://i.pravatar.cc/150?img=3',
-		phone: '+1 (555) 345-6789',
-	},
-	{
-		id: '4',
-		name: 'John Smith',
-		avatar: 'https://i.pravatar.cc/150?img=4',
-		phone: '+1 (555) 456-7890',
-	},
-	{
-		id: '5',
-		name: 'Lisa Johnson',
-		avatar: 'https://i.pravatar.cc/150?img=9',
-		phone: '+1 (555) 567-8901',
+		firstName: 'Emma',
+		lastName: 'Davis',
+		email: 'emma.davis@example.com',
 	},
 ];
 
 interface RequestBottomSheetProps {
-	bottomSheetModalRef: React.RefObject<BottomSheetModal | null>;
+	bottomSheetModalRef: React.RefObject<BottomSheetModal>;
 	onRequest: (amount: number, requesters: string[], note: string) => void;
 }
 
@@ -53,51 +42,77 @@ export default function RequestBottomSheet({
 	bottomSheetModalRef,
 	onRequest,
 }: RequestBottomSheetProps) {
+	const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
 	const [amount, setAmount] = useState('');
-	const [selectedContacts, setSelectedContacts] = useState<any[]>([]);
 	const [note, setNote] = useState('');
 	const [searchQuery, setSearchQuery] = useState('');
+	const [isRequesting, setIsRequesting] = useState(false);
 
-	// Variables
-	const snapPoints = useMemo(() => ['25%', '90%'], []);
+	const snapPoints = useMemo(() => ['25%', '50%', '90%'], []);
 
-	// Callbacks
+	const filteredContacts = mockContacts.filter(
+		(contact) =>
+			`${contact.firstName} ${contact.lastName}`
+				.toLowerCase()
+				.includes(searchQuery.toLowerCase()) ||
+			contact.email.toLowerCase().includes(searchQuery.toLowerCase())
+	);
+
 	const handleSheetChanges = useCallback((index: number) => {
 		console.log('handleSheetChanges', index);
 	}, []);
 
-	const handleRequest = () => {
-		if (!amount || selectedContacts.length === 0) return;
-
-		const requesterNames = selectedContacts.map((contact) => contact.name);
-		onRequest(parseFloat(amount), requesterNames, note);
-		setAmount('');
-		setSelectedContacts([]);
-		setNote('');
-		bottomSheetModalRef.current?.dismiss();
+	const toggleContact = (contactId: string) => {
+		setSelectedContacts((prev) =>
+			prev.includes(contactId)
+				? prev.filter((id) => id !== contactId)
+				: [...prev, contactId]
+		);
 	};
 
-	const addContact = (contact: any) => {
-		if (!selectedContacts.find((c) => c.id === contact.id)) {
-			setSelectedContacts([...selectedContacts, contact]);
+	const handleRequest = async () => {
+		if (selectedContacts.length === 0) {
+			Alert.alert('Error', 'Please select at least one person to request from');
+			return;
 		}
-		setSearchQuery('');
+
+		if (!amount || parseFloat(amount) <= 0) {
+			Alert.alert('Error', 'Please enter a valid amount');
+			return;
+		}
+
+		setIsRequesting(true);
+		try {
+			const selectedNames = selectedContacts.map((id) => {
+				const contact = mockContacts.find((c) => c.id === id);
+				return contact ? `${contact.firstName} ${contact.lastName}` : 'Unknown';
+			});
+
+			console.log('Requesting payment:', {
+				amount: parseFloat(amount),
+				requesters: selectedNames,
+				note,
+			});
+
+			// Simulate API call
+			await new Promise((resolve) => setTimeout(resolve, 1500));
+
+			onRequest(parseFloat(amount), selectedNames, note);
+
+			// Reset form
+			setSelectedContacts([]);
+			setAmount('');
+			setNote('');
+			setSearchQuery('');
+
+			bottomSheetModalRef.current?.dismiss();
+		} catch (error) {
+			console.error('Request error:', error);
+			Alert.alert('Error', 'Failed to send request. Please try again.');
+		} finally {
+			setIsRequesting(false);
+		}
 	};
-
-	const removeContact = (contactId: string) => {
-		setSelectedContacts(selectedContacts.filter((c) => c.id !== contactId));
-	};
-
-	const filteredContacts = contacts.filter(
-		(contact) =>
-			contact.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-			!selectedContacts.find((c) => c.id === contact.id)
-	);
-
-	const totalPerPerson =
-		selectedContacts.length > 0
-			? parseFloat(amount || '0') / selectedContacts.length
-			: 0;
 
 	return (
 		<BottomSheetModal
@@ -105,13 +120,11 @@ export default function RequestBottomSheet({
 			index={1}
 			snapPoints={snapPoints}
 			onChange={handleSheetChanges}
-			backgroundStyle={{ backgroundColor: 'white' }}
-			handleIndicatorStyle={{ backgroundColor: '#E0E0E0' }}
 		>
-			<BottomSheetView className='flex-1 px-6' style={{ paddingBottom: 32 }}>
+			<BottomSheetView className='flex-1 px-6 py-4'>
 				{/* Header */}
-				<View className='flex-row items-center justify-between mb-8'>
-					<Text className='text-2xl font-bold text-text-main'>
+				<View className='flex-row items-center justify-between mb-6'>
+					<Text className='text-2xl font-bold text-gray-900'>
 						Request Money
 					</Text>
 					<TouchableOpacity
@@ -123,212 +136,116 @@ export default function RequestBottomSheet({
 				</View>
 
 				{/* Amount Input */}
-				<View className='mb-8'>
-					<Text className='mb-3 text-base font-semibold text-gray-700'>
+				<View className='mb-6'>
+					<Text className='mb-3 text-lg font-semibold text-gray-900'>
 						Amount
 					</Text>
-					<View className='flex-row items-center px-4 py-4 bg-white border border-gray-300 rounded-2xl'>
-						<Text className='mr-3 text-3xl font-bold text-text-main'>$</Text>
+					<View className='flex-row items-center p-4 border border-gray-300 rounded-xl'>
+						<Text className='mr-3 text-xl font-bold text-green-600'>$</Text>
 						<TextInput
+							placeholder='0.00'
 							value={amount}
 							onChangeText={setAmount}
-							placeholder='0.00'
 							keyboardType='decimal-pad'
-							className='flex-1 text-3xl font-bold text-text-main'
-							placeholderTextColor='#999'
-							style={{ fontSize: 28 }}
+							className='flex-1 text-xl font-semibold'
+							placeholderTextColor='#9CA3AF'
+						/>
+						<Text className='ml-3 text-sm font-medium text-gray-500'>USD</Text>
+					</View>
+				</View>
+
+				{/* Contact Search */}
+				<View className='mb-4'>
+					<Text className='mb-3 text-lg font-semibold text-gray-900'>
+						Request From ({selectedContacts.length} selected)
+					</Text>
+					<View className='flex-row items-center p-3 border border-gray-300 rounded-xl'>
+						<Ionicons name='search' size={20} color='#9CA3AF' />
+						<TextInput
+							placeholder='Search contacts...'
+							value={searchQuery}
+							onChangeText={setSearchQuery}
+							className='flex-1 ml-3 text-base'
+							placeholderTextColor='#9CA3AF'
 						/>
 					</View>
 				</View>
 
-				{/* Contact Selection */}
-				<View className='mb-8'>
-					<Text className='mb-3 text-base font-semibold text-gray-700'>
-						From
-					</Text>
-
-					{/* Search with Pills Inside */}
-					<View className='border border-gray-300 rounded-2xl p-4 bg-white min-h-[70px]'>
-						{/* Selected Contacts Pills */}
-						{selectedContacts.length > 0 && (
-							<View className='mb-4'>
-								<View className='flex-row flex-wrap gap-2'>
-									{selectedContacts.map((contact) => (
-										<View
-											key={contact.id}
-											className='flex-row items-center px-3 py-2 rounded-full bg-primary-green'
-										>
-											<Image
-												source={{ uri: contact.avatar }}
-												style={{
-													width: 20,
-													height: 20,
-													borderRadius: 10,
-													marginRight: 6,
-												}}
-												contentFit='cover'
-												placeholder='👤'
-												transition={200}
-											/>
-											<Text className='mr-2 text-sm font-medium text-white'>
-												{contact.name}
-											</Text>
-											<TouchableOpacity
-												onPress={() => removeContact(contact.id)}
-											>
-												<Ionicons name='close-circle' size={16} color='white' />
-											</TouchableOpacity>
-										</View>
-									))}
-								</View>
-							</View>
-						)}
-
-						{/* Search Input */}
-						<View className='flex-row items-center'>
-							<Ionicons name='search' size={18} color='#666' />
-							<TextInput
-								value={searchQuery}
-								onChangeText={setSearchQuery}
-								placeholder={
-									selectedContacts.length === 0
-										? 'Search contacts...'
-										: 'Add more contacts...'
-								}
-								className='flex-1 ml-2 text-base text-text-main'
-								placeholderTextColor='#999'
-								style={{
-									fontSize: 16,
-									paddingVertical: 4,
-									textAlignVertical: 'center',
-								}}
-							/>
-						</View>
-					</View>
-
-					{/* Per Person Amount */}
-					{selectedContacts.length > 1 && amount && (
-						<Text className='mt-3 ml-1 text-sm text-gray-500'>
-							${totalPerPerson.toFixed(2)} per person
-						</Text>
-					)}
-
-					{/* Contact List */}
-					{searchQuery && (
-						<ScrollView
-							className='mt-4 max-h-48'
-							showsVerticalScrollIndicator={false}
+				{/* Contacts List */}
+				<ScrollView
+					className='flex-1 mb-4'
+					showsVerticalScrollIndicator={false}
+				>
+					{filteredContacts.map((contact) => (
+						<TouchableOpacity
+							key={contact.id}
+							onPress={() => toggleContact(contact.id)}
+							className={`flex-row items-center p-4 mb-2 border rounded-xl ${
+								selectedContacts.includes(contact.id)
+									? 'border-green-500 bg-green-50'
+									: 'border-gray-200 bg-white'
+							}`}
 						>
-							{filteredContacts.map((contact) => (
-								<TouchableOpacity
-									key={contact.id}
-									className='flex-row items-center p-4 border-b border-gray-100 last:border-b-0'
-									onPress={() => addContact(contact)}
-								>
-									<Image
-										source={{ uri: contact.avatar }}
-										style={{
-											width: 44,
-											height: 44,
-											borderRadius: 22,
-											marginRight: 16,
-										}}
-										contentFit='cover'
-										placeholder='👤'
-										transition={200}
-									/>
-									<View className='flex-1'>
-										<Text className='text-base font-medium text-text-main'>
-											{contact.name}
-										</Text>
-										<Text className='mt-1 text-sm text-gray-500'>
-											{contact.phone}
-										</Text>
-									</View>
-									<Ionicons name='add-circle' size={24} color='#00C896' />
-								</TouchableOpacity>
-							))}
-						</ScrollView>
-					)}
-
-					{/* Quick Add Suggestions */}
-					{!searchQuery && selectedContacts.length === 0 && (
-						<View className='mt-4'>
-							<Text className='mb-4 ml-1 text-sm text-gray-600'>
-								Quick add:
-							</Text>
-							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-								<View className='flex-row space-x-4'>
-									{contacts.slice(0, 4).map((contact) => (
-										<TouchableOpacity
-											key={contact.id}
-											className='items-center'
-											onPress={() => addContact(contact)}
-										>
-											<Image
-												source={{ uri: contact.avatar }}
-												style={{
-													width: 56,
-													height: 56,
-													borderRadius: 28,
-													marginBottom: 8,
-												}}
-												contentFit='cover'
-												placeholder='👤'
-												transition={200}
-											/>
-											<Text
-												className='text-xs text-center text-gray-600'
-												numberOfLines={1}
-											>
-												{contact.name.split(' ')[0]}
-											</Text>
-										</TouchableOpacity>
-									))}
-								</View>
-							</ScrollView>
-						</View>
-					)}
-				</View>
+							<View className='items-center justify-center w-12 h-12 mr-4 bg-gray-200 rounded-full'>
+								<Text className='text-lg font-bold text-gray-600'>
+									{contact.firstName[0]}
+								</Text>
+							</View>
+							<View className='flex-1'>
+								<Text className='text-base font-semibold text-gray-900'>
+									{contact.firstName} {contact.lastName}
+								</Text>
+								<Text className='text-sm text-gray-500'>{contact.email}</Text>
+							</View>
+							{selectedContacts.includes(contact.id) && (
+								<Ionicons name='checkmark-circle' size={24} color='#10B981' />
+							)}
+						</TouchableOpacity>
+					))}
+				</ScrollView>
 
 				{/* Note Input */}
-				<View className='mb-8'>
-					<Text className='mb-3 text-base font-semibold text-gray-700'>
-						Message (Optional)
+				<View className='mb-6'>
+					<Text className='mb-3 text-lg font-semibold text-gray-900'>
+						Note (Optional)
 					</Text>
 					<TextInput
+						placeholder="What's this request for?"
 						value={note}
 						onChangeText={setNote}
-						placeholder="What's this for?"
-						className='px-4 py-4 text-base bg-white border border-gray-300 rounded-2xl text-text-main'
-						placeholderTextColor='#999'
 						multiline
-						style={{ fontSize: 16, minHeight: 60 }}
+						numberOfLines={2}
+						className='p-4 text-base border border-gray-300 rounded-xl'
+						placeholderTextColor='#9CA3AF'
+						textAlignVertical='top'
 					/>
 				</View>
 
 				{/* Request Button */}
 				<TouchableOpacity
-					className={`py-5 rounded-2xl items-center ${
-						amount && selectedContacts.length > 0
-							? 'bg-primary-green'
+					onPress={handleRequest}
+					disabled={selectedContacts.length === 0 || !amount || isRequesting}
+					className={`p-4 rounded-xl ${
+						selectedContacts.length > 0 && amount && !isRequesting
+							? 'bg-green-600'
 							: 'bg-gray-300'
 					}`}
-					style={{ paddingHorizontal: 16 }}
-					onPress={handleRequest}
-					disabled={!amount || selectedContacts.length === 0}
 				>
-					<Text
-						className={`text-lg font-semibold ${
-							amount && selectedContacts.length > 0
-								? 'text-white'
-								: 'text-gray-500'
-						}`}
-					>
-						Request ${amount || '0.00'}
-						{selectedContacts.length > 1 &&
-							` from ${selectedContacts.length} people`}
-					</Text>
+					{isRequesting ? (
+						<View className='flex-row items-center justify-center'>
+							<ActivityIndicator size='small' color='white' />
+							<Text className='ml-2 text-lg font-semibold text-white'>
+								Sending Request...
+							</Text>
+						</View>
+					) : (
+						<View className='flex-row items-center justify-center'>
+							<Ionicons name='hand-left' size={20} color='white' />
+							<Text className='ml-2 text-lg font-semibold text-white'>
+								Request {amount ? `$${amount}` : 'Money'}
+							</Text>
+						</View>
+					)}
 				</TouchableOpacity>
 			</BottomSheetView>
 		</BottomSheetModal>

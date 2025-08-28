@@ -3,21 +3,14 @@ import {
 	View,
 	Text,
 	Modal,
-	TouchableOpacity,
 	TextInput,
+	TouchableOpacity,
 	ScrollView,
 	Alert,
 	ActivityIndicator,
-	FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import {
-	ActivityService,
-	ActivityType,
-	type CreateActivityData,
-} from '@/services/activityService';
-import { AuthService, type UserProfile } from '@/services/authService';
 
 interface CreateActivityModalProps {
 	visible: boolean;
@@ -25,147 +18,99 @@ interface CreateActivityModalProps {
 	onActivityCreated: () => void;
 }
 
+const activityTypes = [
+	{ id: 'dining', name: 'Dining', icon: '🍽️', color: '#F59E0B' },
+	{ id: 'entertainment', name: 'Entertainment', icon: '🎬', color: '#8B5CF6' },
+	{ id: 'travel', name: 'Travel', icon: '✈️', color: '#3B82F6' },
+	{ id: 'shopping', name: 'Shopping', icon: '🛒', color: '#10B981' },
+	{ id: 'housing', name: 'Housing', icon: '🏠', color: '#EF4444' },
+	{ id: 'utilities', name: 'Utilities', icon: '⚡', color: '#6B7280' },
+	{ id: 'other', name: 'Other', icon: '📝', color: '#9CA3AF' },
+];
+
+const mockMembers = [
+	{ id: '1', name: 'Sarah Wilson', email: 'sarah@example.com' },
+	{ id: '2', name: 'Mike Chen', email: 'mike@example.com' },
+	{ id: '3', name: 'Emma Davis', email: 'emma@example.com' },
+	{ id: '4', name: 'John Smith', email: 'john@example.com' },
+];
+
 export default function CreateActivityModal({
 	visible,
 	onClose,
 	onActivityCreated,
 }: CreateActivityModalProps) {
-	const [formData, setFormData] = useState<CreateActivityData>({
-		name: '',
-		type: ActivityType.PERSONAL,
-		description: '',
-		icon: '',
-		memberIds: [],
-	});
-	const [isLoading, setIsLoading] = useState(false);
-	const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+	const [activityName, setActivityName] = useState('');
+	const [description, setDescription] = useState('');
+	const [selectedType, setSelectedType] = useState('dining');
+	const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+	const [isCreating, setIsCreating] = useState(false);
 
-	// User search states
-	const [userSearchQuery, setUserSearchQuery] = useState('');
-	const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
-	const [selectedUsers, setSelectedUsers] = useState<UserProfile[]>([]);
-	const [isSearching, setIsSearching] = useState(false);
-	const [showUserSearch, setShowUserSearch] = useState(false);
-
-	const activityTypeOptions = ActivityService.getActivityTypeOptions();
-
-	// User search functionality
-	const handleUserSearch = async () => {
-		if (!userSearchQuery.trim()) {
-			Alert.alert('Search Query', 'Please enter a search term');
-			return;
-		}
-
-		setIsSearching(true);
-		try {
-			const { DIDAuthService } = await import('../services/didAuthService');
-			const didToken = await DIDAuthService.getTokenForAPICall();
-			if (!didToken) {
-				throw new Error('No DID authentication token found');
-			}
-
-			const results = await AuthService.searchUsers(didToken, userSearchQuery);
-			setSearchResults(results);
-		} catch (error) {
-			console.error('User search error:', error);
-			Alert.alert('Search Failed', 'Failed to search users. Please try again.');
-		} finally {
-			setIsSearching(false);
-		}
-	};
-
-	const addUserToActivity = (user: UserProfile) => {
-		if (!selectedUsers.find((u) => u.email === user.email)) {
-			const newSelectedUsers = [...selectedUsers, user];
-			setSelectedUsers(newSelectedUsers);
-
-			// Update memberIds in formData (assuming we have user IDs)
-			const memberEmails = newSelectedUsers.map((u) => u.email);
-			updateFormData('memberIds', memberEmails);
-		}
-		setUserSearchQuery('');
-		setSearchResults([]);
-	};
-
-	const removeUserFromActivity = (userEmail: string) => {
-		const newSelectedUsers = selectedUsers.filter((u) => u.email !== userEmail);
-		setSelectedUsers(newSelectedUsers);
-
-		// Update memberIds in formData
-		const memberEmails = newSelectedUsers.map((u) => u.email);
-		updateFormData('memberIds', memberEmails);
-	};
-
-	const updateFormData = (field: keyof CreateActivityData, value: any) => {
-		setFormData((prev) => ({
-			...prev,
-			[field]: value,
-		}));
-	};
-
-	const validateForm = (): boolean => {
-		return formData.name.trim().length > 0;
-	};
-
-	const handleSubmit = async () => {
-		if (!validateForm()) {
-			Alert.alert('Validation Error', 'Please fill in all required fields');
-			return;
-		}
-
-		setIsLoading(true);
-		try {
-			await ActivityService.createActivity(formData);
-			Alert.alert('Success', 'Activity created successfully!');
-			setFormData({
-				name: '',
-				type: ActivityType.PERSONAL,
-				description: '',
-				icon: '',
-				memberIds: [],
-			});
-
-			// Reset user search states
-			setUserSearchQuery('');
-			setSearchResults([]);
-			setSelectedUsers([]);
-			setShowUserSearch(false);
-
-			onActivityCreated();
-			onClose();
-		} catch (error) {
-			console.error('Error creating activity:', error);
-			Alert.alert(
-				'Error',
-				error instanceof Error ? error.message : 'Failed to create activity'
-			);
-		} finally {
-			setIsLoading(false);
-		}
+	const handleReset = () => {
+		setActivityName('');
+		setDescription('');
+		setSelectedType('dining');
+		setSelectedMembers([]);
 	};
 
 	const handleClose = () => {
-		if (isLoading) return;
-		setFormData({
-			name: '',
-			type: ActivityType.PERSONAL,
-			description: '',
-			icon: '',
-			memberIds: [],
-		});
-		setShowTypeDropdown(false);
-
-		// Reset user search states
-		setUserSearchQuery('');
-		setSearchResults([]);
-		setSelectedUsers([]);
-		setShowUserSearch(false);
-
+		handleReset();
 		onClose();
 	};
 
-	const selectedTypeOption = activityTypeOptions.find(
-		(option) => option.value === formData.type
+	const toggleMember = (memberId: string) => {
+		setSelectedMembers((prev) =>
+			prev.includes(memberId)
+				? prev.filter((id) => id !== memberId)
+				: [...prev, memberId]
+		);
+	};
+
+	const handleCreate = async () => {
+		if (!activityName.trim()) {
+			Alert.alert('Error', 'Please enter an activity name');
+			return;
+		}
+
+		if (selectedMembers.length === 0) {
+			Alert.alert('Error', 'Please select at least one member');
+			return;
+		}
+
+		setIsCreating(true);
+		try {
+			// Move creation logic to services
+			const activityData = {
+				name: activityName.trim(),
+				description: description.trim(),
+				type: selectedType,
+				members: selectedMembers,
+			};
+
+			console.log('Creating activity:', activityData);
+
+			// Simulate API call
+			await new Promise((resolve) => setTimeout(resolve, 2000));
+
+			Alert.alert('Success', 'Activity created successfully!', [
+				{
+					text: 'OK',
+					onPress: () => {
+						onActivityCreated();
+						handleClose();
+					},
+				},
+			]);
+		} catch (error) {
+			console.error('Create activity error:', error);
+			Alert.alert('Error', 'Failed to create activity. Please try again.');
+		} finally {
+			setIsCreating(false);
+		}
+	};
+
+	const selectedType_obj = activityTypes.find(
+		(type) => type.id === selectedType
 	);
 
 	return (
@@ -176,282 +121,167 @@ export default function CreateActivityModal({
 			onRequestClose={handleClose}
 		>
 			<SafeAreaView className='flex-1 bg-white'>
-				{/* Header */}
-				<View className='flex-row items-center justify-between p-4 border-b border-gray-200'>
-					<TouchableOpacity onPress={handleClose} disabled={isLoading}>
-						<Ionicons name='close' size={24} color='#666' />
-					</TouchableOpacity>
-					<Text className='text-lg font-semibold text-gray-900'>
-						Create New Activity
-					</Text>
-					<TouchableOpacity
-						onPress={handleSubmit}
-						disabled={!validateForm() || isLoading}
-						className={`px-4 py-2 rounded-lg ${
-							validateForm() && !isLoading ? 'bg-blue-500' : 'bg-gray-300'
-						}`}
-					>
-						{isLoading ? (
-							<ActivityIndicator size='small' color='white' />
-						) : (
-							<Text className='font-medium text-white'>Create</Text>
-						)}
-					</TouchableOpacity>
-				</View>
+				<ScrollView className='flex-1 px-6 py-4'>
+					{/* Header */}
+					<View className='flex-row items-center justify-between mb-6'>
+						<Text className='text-2xl font-bold text-gray-900'>
+							Create Activity
+						</Text>
+						<TouchableOpacity onPress={handleClose} className='p-2'>
+							<Ionicons name='close' size={24} color='#666' />
+						</TouchableOpacity>
+					</View>
 
-				{/* Form */}
-				<ScrollView className='flex-1 p-4' showsVerticalScrollIndicator={false}>
 					{/* Activity Name */}
 					<View className='mb-6'>
-						<Text className='mb-2 text-base font-medium text-gray-900'>
-							Activity Name <Text className='text-red-500'>*</Text>
+						<Text className='mb-3 text-lg font-semibold text-gray-900'>
+							Activity Name
 						</Text>
 						<TextInput
-							className='p-3 text-base border border-gray-300 rounded-lg'
-							placeholder='Enter activity name'
-							value={formData.name}
-							onChangeText={(text) => updateFormData('name', text)}
-							maxLength={100}
+							placeholder='Enter activity name...'
+							value={activityName}
+							onChangeText={setActivityName}
+							className='p-4 text-base border border-gray-300 rounded-xl'
+							placeholderTextColor='#9CA3AF'
+						/>
+					</View>
+
+					{/* Description */}
+					<View className='mb-6'>
+						<Text className='mb-3 text-lg font-semibold text-gray-900'>
+							Description (Optional)
+						</Text>
+						<TextInput
+							placeholder="What's this activity about?"
+							value={description}
+							onChangeText={setDescription}
+							multiline
+							numberOfLines={3}
+							className='p-4 text-base border border-gray-300 rounded-xl'
+							placeholderTextColor='#9CA3AF'
+							textAlignVertical='top'
 						/>
 					</View>
 
 					{/* Activity Type */}
 					<View className='mb-6'>
-						<Text className='mb-2 text-base font-medium text-gray-900'>
-							Activity Type <Text className='text-red-500'>*</Text>
+						<Text className='mb-3 text-lg font-semibold text-gray-900'>
+							Activity Type
 						</Text>
-						<TouchableOpacity
-							className='flex-row items-center justify-between p-3 border border-gray-300 rounded-lg'
-							onPress={() => setShowTypeDropdown(!showTypeDropdown)}
-						>
-							<View className='flex-row items-center'>
-								<Text className='mr-3 text-xl'>{selectedTypeOption?.icon}</Text>
-								<Text className='text-base text-gray-900'>
-									{selectedTypeOption?.label}
-								</Text>
-							</View>
-							<Ionicons
-								name={showTypeDropdown ? 'chevron-up' : 'chevron-down'}
-								size={20}
-								color='#666'
-							/>
-						</TouchableOpacity>
-
-						{/* Type Dropdown */}
-						{showTypeDropdown && (
-							<View className='mt-2 bg-white border border-gray-200 rounded-lg shadow-sm'>
-								{activityTypeOptions.map((option) => (
+						<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+							<View className='flex-row gap-3'>
+								{activityTypes.map((type) => (
 									<TouchableOpacity
-										key={option.value}
-										className='flex-row items-center p-3 border-b border-gray-100 last:border-b-0'
-										onPress={() => {
-											updateFormData('type', option.value);
-											setShowTypeDropdown(false);
-										}}
-									>
-										<Text className='mr-3 text-xl'>{option.icon}</Text>
-										<Text className='text-base text-gray-900'>
-											{option.label}
-										</Text>
-										{formData.type === option.value && (
-											<Ionicons
-												name='checkmark'
-												size={20}
-												color='#3D5AFE'
-												style={{ marginLeft: 'auto' }}
-											/>
-										)}
-									</TouchableOpacity>
-								))}
-							</View>
-						)}
-					</View>
-
-					{/* Description */}
-					<View className='mb-6'>
-						<Text className='mb-2 text-base font-medium text-gray-900'>
-							Description
-						</Text>
-						<TextInput
-							className='p-3 text-base border border-gray-300 rounded-lg'
-							placeholder='Enter activity description (optional)'
-							value={formData.description}
-							onChangeText={(text) => updateFormData('description', text)}
-							multiline
-							numberOfLines={3}
-							maxLength={500}
-							textAlignVertical='top'
-						/>
-					</View>
-
-					{/* Custom Icon */}
-					<View className='mb-6'>
-						<Text className='mb-2 text-base font-medium text-gray-900'>
-							Custom Icon
-						</Text>
-						<TextInput
-							className='p-3 text-base border border-gray-300 rounded-lg'
-							placeholder='Enter emoji or icon (optional)'
-							value={formData.icon}
-							onChangeText={(text) => updateFormData('icon', text)}
-							maxLength={10}
-						/>
-						{formData.icon && (
-							<View className='p-2 mt-2 rounded-lg bg-gray-50'>
-								<Text className='text-2xl text-center'>{formData.icon}</Text>
-							</View>
-						)}
-					</View>
-
-					{/* Add Members */}
-					<View className='mb-6'>
-						<View className='flex-row items-center justify-between mb-2'>
-							<Text className='text-base font-medium text-gray-900'>
-								Add Members
-							</Text>
-							<TouchableOpacity
-								className='px-3 py-1 bg-blue-100 rounded-lg'
-								onPress={() => setShowUserSearch(!showUserSearch)}
-							>
-								<Text className='text-sm font-medium text-blue-600'>
-									{showUserSearch ? 'Hide Search' : 'Search Users'}
-								</Text>
-							</TouchableOpacity>
-						</View>
-
-						{/* User Search */}
-						{showUserSearch && (
-							<View className='p-3 mb-4 rounded-lg bg-gray-50'>
-								<View className='flex-row items-center mb-3'>
-									<TextInput
-										className='flex-1 p-2 mr-2 text-base bg-white border border-gray-300 rounded-lg'
-										placeholder='Search by email, phone, or username...'
-										value={userSearchQuery}
-										onChangeText={setUserSearchQuery}
-										onSubmitEditing={handleUserSearch}
-									/>
-									<TouchableOpacity
-										className={`px-4 py-2 rounded-lg ${
-											isSearching ? 'bg-gray-400' : 'bg-blue-500'
+										key={type.id}
+										onPress={() => setSelectedType(type.id)}
+										className={`p-4 rounded-xl border-2 min-w-[100px] ${
+											selectedType === type.id
+												? 'border-blue-500 bg-blue-50'
+												: 'border-gray-200 bg-white'
 										}`}
-										onPress={handleUserSearch}
-										disabled={isSearching}
 									>
-										{isSearching ? (
-											<ActivityIndicator size='small' color='white' />
-										) : (
-											<Text className='font-medium text-white'>Search</Text>
-										)}
-									</TouchableOpacity>
-								</View>
-
-								{/* Search Results */}
-								{searchResults.length > 0 && (
-									<View className='max-h-40'>
-										<Text className='mb-2 text-sm font-medium text-gray-700'>
-											Found {searchResults.length} user(s):
-										</Text>
-										<FlatList
-											data={searchResults}
-											keyExtractor={(item) => item.email}
-											renderItem={({ item }) => (
-												<TouchableOpacity
-													className='flex-row items-center p-2 mb-1 bg-white border border-gray-200 rounded'
-													onPress={() => addUserToActivity(item)}
-												>
-													<View className='flex-1'>
-														<Text className='font-medium text-gray-900'>
-															{item.firstName} {item.lastName}
-														</Text>
-														<Text className='text-sm text-gray-600'>
-															{item.email}
-														</Text>
-													</View>
-													<Ionicons
-														name='add-circle'
-														size={20}
-														color='#3D5AFE'
-													/>
-												</TouchableOpacity>
-											)}
-											style={{ maxHeight: 120 }}
-											nestedScrollEnabled
-										/>
-									</View>
-								)}
-
-								{searchResults.length === 0 &&
-									userSearchQuery &&
-									!isSearching && (
-										<Text className='text-sm text-center text-gray-500'>
-											No users found. Try a different search term.
-										</Text>
-									)}
-							</View>
-						)}
-
-						{/* Selected Members */}
-						{selectedUsers.length > 0 && (
-							<View className='p-3 rounded-lg bg-blue-50'>
-								<Text className='mb-2 text-sm font-medium text-gray-700'>
-									Selected Members ({selectedUsers.length}):
-								</Text>
-								{selectedUsers.map((user) => (
-									<View
-										key={user.email}
-										className='flex-row items-center justify-between p-2 mb-1 bg-white border border-blue-200 rounded'
-									>
-										<View className='flex-1'>
-											<Text className='font-medium text-gray-900'>
-												{user.firstName} {user.lastName}
-											</Text>
-											<Text className='text-sm text-gray-600'>
-												{user.email}
-											</Text>
-										</View>
-										<TouchableOpacity
-											onPress={() => removeUserFromActivity(user.email)}
+										<Text className='text-2xl text-center'>{type.icon}</Text>
+										<Text
+											className={`text-sm font-medium text-center mt-1 ${
+												selectedType === type.id
+													? 'text-blue-900'
+													: 'text-gray-900'
+											}`}
 										>
-											<Ionicons name='close-circle' size={20} color='#EF4444' />
-										</TouchableOpacity>
-									</View>
+											{type.name}
+										</Text>
+									</TouchableOpacity>
 								))}
 							</View>
-						)}
+						</ScrollView>
+					</View>
+
+					{/* Members Selection */}
+					<View className='mb-6'>
+						<Text className='mb-3 text-lg font-semibold text-gray-900'>
+							Add Members ({selectedMembers.length} selected)
+						</Text>
+						{mockMembers.map((member) => (
+							<TouchableOpacity
+								key={member.id}
+								onPress={() => toggleMember(member.id)}
+								className={`flex-row items-center p-4 mb-2 border rounded-xl ${
+									selectedMembers.includes(member.id)
+										? 'border-blue-500 bg-blue-50'
+										: 'border-gray-200 bg-white'
+								}`}
+							>
+								<View className='items-center justify-center w-12 h-12 mr-4 bg-gray-200 rounded-full'>
+									<Text className='text-lg font-bold text-gray-600'>
+										{member.name[0]}
+									</Text>
+								</View>
+								<View className='flex-1'>
+									<Text className='text-base font-semibold text-gray-900'>
+										{member.name}
+									</Text>
+									<Text className='text-sm text-gray-500'>{member.email}</Text>
+								</View>
+								{selectedMembers.includes(member.id) && (
+									<Ionicons name='checkmark-circle' size={24} color='#3B82F6' />
+								)}
+							</TouchableOpacity>
+						))}
 					</View>
 
 					{/* Preview */}
-					<View className='p-4 mb-6 rounded-lg bg-gray-50'>
-						<Text className='mb-2 text-sm font-medium text-gray-600'>
-							Preview
-						</Text>
-						<View className='flex-row items-center mb-3'>
-							<View className='items-center justify-center w-12 h-12 mr-3 bg-white rounded-full shadow-sm'>
-								<Text className='text-xl'>
-									{formData.icon || selectedTypeOption?.icon}
+					{activityName && selectedMembers.length > 0 && (
+						<View className='p-4 mb-6 rounded-xl bg-gray-50'>
+							<Text className='mb-2 text-sm font-medium text-gray-600'>
+								Preview:
+							</Text>
+							<View className='flex-row items-center mb-2'>
+								<Text className='mr-2 text-xl'>{selectedType_obj?.icon}</Text>
+								<Text className='text-base font-semibold text-gray-900'>
+									{activityName}
 								</Text>
 							</View>
-							<View className='flex-1'>
-								<Text className='text-base font-medium text-gray-900'>
-									{formData.name || 'Activity Name'}
+							{description && (
+								<Text className='mb-2 text-sm text-gray-600'>
+									{description}
 								</Text>
-								<Text className='text-sm text-gray-600'>
-									{formData.description || 'No description'}
-								</Text>
-								<Text className='mt-1 text-xs text-gray-500'>
-									{selectedTypeOption?.label}
-								</Text>
-							</View>
+							)}
+							<Text className='text-sm text-gray-600'>
+								{selectedMembers.length} member
+								{selectedMembers.length !== 1 ? 's' : ''} •{' '}
+								{selectedType_obj?.name}
+							</Text>
 						</View>
-						{selectedUsers.length > 0 && (
-							<View className='flex-row items-center mt-2'>
-								<Ionicons name='people-outline' size={14} color='#666' />
-								<Text className='ml-1 text-xs text-gray-500'>
-									{selectedUsers.length + 1} members (including you)
+					)}
+
+					{/* Create Button */}
+					<TouchableOpacity
+						onPress={handleCreate}
+						disabled={
+							!activityName.trim() || selectedMembers.length === 0 || isCreating
+						}
+						className={`p-4 rounded-xl ${
+							activityName.trim() && selectedMembers.length > 0 && !isCreating
+								? 'bg-blue-600'
+								: 'bg-gray-300'
+						}`}
+					>
+						{isCreating ? (
+							<View className='flex-row items-center justify-center'>
+								<ActivityIndicator size='small' color='white' />
+								<Text className='ml-2 text-lg font-semibold text-white'>
+									Creating...
+								</Text>
+							</View>
+						) : (
+							<View className='flex-row items-center justify-center'>
+								<Ionicons name='add-circle' size={20} color='white' />
+								<Text className='ml-2 text-lg font-semibold text-white'>
+									Create Activity
 								</Text>
 							</View>
 						)}
-					</View>
+					</TouchableOpacity>
 				</ScrollView>
 			</SafeAreaView>
 		</Modal>

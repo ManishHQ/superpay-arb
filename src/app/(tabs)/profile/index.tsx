@@ -10,12 +10,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { useUserStore, useAuthStore, useBalanceStore } from '@/stores';
 
-// Mock stats data (we'll replace this with real API data later)
+// Mock user data
+const mockUser = {
+	firstName: 'John',
+	lastName: 'Doe',
+	email: 'john.doe@example.com',
+	phone: '+1 (555) 123-4567',
+	avatarUrl: 'https://i.pravatar.cc/150?img=5',
+};
+
+// Mock stats data
 const userStats = {
 	totalTransactions: 156,
 	activeGroups: 8,
@@ -27,23 +35,6 @@ const userStats = {
 };
 
 export default function ProfileScreen() {
-	// Zustand stores
-	const {
-		user: userData,
-		isLoading,
-		error,
-		fetchUserProfile,
-		clearError,
-	} = useUserStore();
-	const { logout } = useAuthStore();
-	const {
-		usdcBalance,
-		usdcLoading: isLoadingBalance,
-		usdcError: balanceError,
-		fetchUsdcBalance,
-		fetchAllBalances,
-	} = useBalanceStore();
-
 	// Privacy & Settings States
 	const [profileVisible, setProfileVisible] = useState(false);
 	const [portfolioVisible, setPortfolioVisible] = useState(false);
@@ -52,31 +43,16 @@ export default function ProfileScreen() {
 	const [biometric, setBiometric] = useState(true);
 	const [autoSplit, setAutoSplit] = useState(true);
 
-	// Refresh state
+	// Loading states
+	const [isLoading, setIsLoading] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
-
-	// Fetch user data on component mount if not already loaded
-	useEffect(() => {
-		if (!userData && !isLoading) {
-			fetchUserProfile();
-		}
-	}, [userData, isLoading, fetchUserProfile]);
-
-	// Fetch USDC balance on component mount
-	useEffect(() => {
-		fetchUsdcBalance();
-	}, [fetchUsdcBalance]);
 
 	// Handle pull-to-refresh
 	const onRefresh = async () => {
 		setRefreshing(true);
-		try {
-			await Promise.all([fetchUserProfile(), fetchAllBalances()]);
-		} catch (error) {
-			console.error('Error refreshing data:', error);
-		} finally {
-			setRefreshing(false);
-		}
+		// Move refresh logic to services
+		console.log('Refreshing profile data...');
+		setTimeout(() => setRefreshing(false), 1000);
 	};
 
 	const handleEditProfile = () => {
@@ -112,15 +88,10 @@ export default function ProfileScreen() {
 			{
 				text: 'Sign Out',
 				style: 'destructive',
-				onPress: async () => {
-					try {
-						await logout();
-						// Don't show success alert as user will be redirected
-						console.log('User logged out successfully');
-					} catch (error) {
-						console.error('Logout error:', error);
-						Alert.alert('Error', 'Failed to sign out. Please try again.');
-					}
+				onPress: () => {
+					// Move logout logic to services
+					console.log('User logged out');
+					Alert.alert('Logged Out', 'You have been signed out successfully.');
 				},
 			},
 		]);
@@ -129,7 +100,7 @@ export default function ProfileScreen() {
 	// Show loading state
 	if (isLoading) {
 		return (
-			<SafeAreaView className='flex-1 bg-bg-light'>
+			<SafeAreaView className='flex-1 bg-gray-50'>
 				<View className='items-center justify-center flex-1'>
 					<ActivityIndicator size='large' color='#3D5AFE' />
 					<Text className='mt-4 text-lg text-gray-600'>Loading profile...</Text>
@@ -138,34 +109,8 @@ export default function ProfileScreen() {
 		);
 	}
 
-	// Show error state
-	if (error || !userData) {
-		return (
-			<SafeAreaView className='flex-1 bg-bg-light'>
-				<View className='items-center justify-center flex-1 px-6'>
-					<Ionicons name='alert-circle' size={64} color='#EF4444' />
-					<Text className='mt-4 text-xl font-semibold text-center text-gray-900'>
-						Failed to Load Profile
-					</Text>
-					<Text className='mt-2 text-base text-center text-gray-600'>
-						{error || 'Unable to load your profile data'}
-					</Text>
-					<TouchableOpacity
-						className='px-6 py-3 mt-6 bg-blue-600 rounded-lg'
-						onPress={() => {
-							clearError();
-							fetchUserProfile();
-						}}
-					>
-						<Text className='font-semibold text-white'>Try Again</Text>
-					</TouchableOpacity>
-				</View>
-			</SafeAreaView>
-		);
-	}
-
 	return (
-		<SafeAreaView className='flex-1 bg-bg-light'>
+		<SafeAreaView className='flex-1 bg-gray-50'>
 			<ScrollView
 				className='flex-1 px-6 py-6'
 				showsVerticalScrollIndicator={false}
@@ -181,14 +126,11 @@ export default function ProfileScreen() {
 				{/* User Identity Section */}
 				<View className='p-8 mb-6 bg-white shadow-sm rounded-2xl'>
 					<View className='items-center mb-6'>
-						{/* Profile Photo with Edit Overlay */}
+						{/* Profile Photo */}
 						<View className='flex-row items-center justify-center mb-8'>
-							<View className='w-32 h-32 srounded-full'>
+							<View className='w-32 h-32 rounded-full'>
 								<Image
-									source={{
-										uri:
-											userData.avatarUrl || 'https://i.pravatar.cc/150?img=5',
-									}}
+									source={{ uri: mockUser.avatarUrl }}
 									style={{
 										width: '100%',
 										height: '100%',
@@ -203,27 +145,24 @@ export default function ProfileScreen() {
 						{/* Name and Username */}
 						<View className='items-center mb-4'>
 							<View className='flex-row items-center mb-1'>
-								<Text className='mr-2 text-2xl font-bold text-text-main'>
-									{userData.firstName} {userData.lastName}
+								<Text className='mr-2 text-2xl font-bold text-gray-900'>
+									{mockUser.firstName} {mockUser.lastName}
 								</Text>
-								{/* Show verification badge if user has completed profile */}
-								{userData.firstName && userData.firstName !== 'User' && (
-									<View className='flex-row items-center'>
-										<Ionicons
-											name='checkmark-circle'
-											size={20}
-											color='#00C896'
-											className='mr-2'
-										/>
-										<Ionicons name='qr-code' size={20} color='#00C896' />
-									</View>
-								)}
+								<View className='flex-row items-center'>
+									<Ionicons
+										name='checkmark-circle'
+										size={20}
+										color='#00C896'
+										className='mr-2'
+									/>
+									<Ionicons name='qr-code' size={20} color='#00C896' />
+								</View>
 							</View>
-							<Text className='text-base font-medium text-primary-blue'>
-								{userData.email}
+							<Text className='text-base font-medium text-blue-600'>
+								{mockUser.email}
 							</Text>
 							<Text className='mt-1 text-sm text-gray-500'>
-								{userData.phone && `Phone: ${userData.phone}`}
+								{mockUser.phone}
 							</Text>
 						</View>
 					</View>
@@ -255,29 +194,15 @@ export default function ProfileScreen() {
 								This month's overview
 							</Text>
 						</View>
-						<View className='flex-row items-center'>
-							<TouchableOpacity
-								onPress={fetchAllBalances}
-								className='mr-3'
-								disabled={isLoadingBalance}
-							>
-								<Ionicons
-									name='refresh'
-									size={20}
-									color='white'
-									style={{ opacity: isLoadingBalance ? 0.5 : 1 }}
-								/>
-							</TouchableOpacity>
-							<TouchableOpacity
-								onPress={() => setPortfolioVisible(!portfolioVisible)}
-							>
-								<Ionicons
-									name={portfolioVisible ? 'eye' : 'eye-off'}
-									size={24}
-									color='white'
-								/>
-							</TouchableOpacity>
-						</View>
+						<TouchableOpacity
+							onPress={() => setPortfolioVisible(!portfolioVisible)}
+						>
+							<Ionicons
+								name={portfolioVisible ? 'eye' : 'eye-off'}
+								size={24}
+								color='white'
+							/>
+						</TouchableOpacity>
 					</View>
 
 					<View>
@@ -331,26 +256,15 @@ export default function ProfileScreen() {
 								style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
 							>
 								<Text className='text-2xl font-bold text-white'>
-									{portfolioVisible ? (
-										isLoadingBalance ? (
-											<ActivityIndicator size='small' color='white' />
-										) : balanceError ? (
-											'Error'
-										) : (
-											`$${parseFloat(usdcBalance).toLocaleString(undefined, {
-												minimumFractionDigits: 2,
-												maximumFractionDigits: 2,
-											})}`
-										)
-									) : (
-										'•••••'
-									)}
+									{portfolioVisible
+										? `$${userStats.portfolioValue.toLocaleString()}`
+										: '•••••'}
 								</Text>
 								<Text
 									style={{ color: 'rgba(255, 255, 255, 0.9)' }}
 									className='text-sm'
 								>
-									USDC Balance
+									Portfolio Value
 								</Text>
 							</View>
 						</View>
@@ -359,7 +273,7 @@ export default function ProfileScreen() {
 
 				{/* Primary Actions Section */}
 				<View className='p-8 mb-6 bg-white shadow-sm rounded-2xl'>
-					<Text className='mb-6 text-xl font-semibold text-text-main'>
+					<Text className='mb-6 text-xl font-semibold text-gray-900'>
 						Quick Actions
 					</Text>
 					<View>
@@ -408,7 +322,7 @@ export default function ProfileScreen() {
 
 				{/* Account Management */}
 				<View className='p-8 mb-6 bg-white shadow-sm rounded-2xl'>
-					<Text className='mb-6 text-xl font-semibold text-text-main'>
+					<Text className='mb-6 text-xl font-semibold text-gray-900'>
 						Account Management
 					</Text>
 					<View className='space-y-2'>
@@ -416,15 +330,7 @@ export default function ProfileScreen() {
 							{
 								icon: 'wallet',
 								title: 'USDC Balance',
-								subtitle: isLoadingBalance
-									? 'Loading...'
-									: balanceError
-									? 'Tap to retry'
-									: `$${parseFloat(usdcBalance).toLocaleString(undefined, {
-											minimumFractionDigits: 2,
-											maximumFractionDigits: 2,
-									  })}`,
-								action: fetchAllBalances,
+								subtitle: '$2,847.50',
 							},
 							{
 								icon: 'card',
@@ -455,13 +361,13 @@ export default function ProfileScreen() {
 						].map((item, index) => (
 							<TouchableOpacity
 								key={index}
-								className='flex-row items-center justify-between py-4 border-b border-muted last:border-b-0'
+								className='flex-row items-center justify-between py-4 border-b border-gray-100 last:border-b-0'
 								onPress={item.action}
 							>
 								<View className='flex-row items-center'>
 									<Ionicons name={item.icon as any} size={24} color='#3D5AFE' />
 									<View className='ml-4'>
-										<Text className='text-base font-medium text-text-main'>
+										<Text className='text-base font-medium text-gray-900'>
 											{item.title}
 										</Text>
 										<Text className='text-sm text-gray-500'>
@@ -477,7 +383,7 @@ export default function ProfileScreen() {
 
 				{/* App Settings & Preferences */}
 				<View className='p-8 mb-6 bg-white shadow-sm rounded-2xl'>
-					<Text className='mb-6 text-xl font-semibold text-text-main'>
+					<Text className='mb-6 text-xl font-semibold text-gray-900'>
 						Preferences
 					</Text>
 					<View className='space-y-2'>
@@ -515,12 +421,12 @@ export default function ProfileScreen() {
 						].map((item, index) => (
 							<View
 								key={index}
-								className='flex-row items-center justify-between py-4 border-b border-muted last:border-b-0'
+								className='flex-row items-center justify-between py-4 border-b border-gray-100 last:border-b-0'
 							>
 								<View className='flex-row items-center'>
 									<Ionicons name={item.icon as any} size={24} color='#3D5AFE' />
 									<View className='ml-4'>
-										<Text className='text-base font-medium text-text-main'>
+										<Text className='text-base font-medium text-gray-900'>
 											{item.title}
 										</Text>
 										{item.subtitle && (
@@ -547,7 +453,7 @@ export default function ProfileScreen() {
 
 				{/* Support & Information */}
 				<View className='p-8 mb-6 bg-white shadow-sm rounded-2xl'>
-					<Text className='mb-6 text-xl font-semibold text-text-main'>
+					<Text className='mb-6 text-xl font-semibold text-gray-900'>
 						Support & Information
 					</Text>
 					<View className='space-y-2'>
@@ -581,13 +487,13 @@ export default function ProfileScreen() {
 						].map((item, index) => (
 							<TouchableOpacity
 								key={index}
-								className='flex-row items-center justify-between py-4 border-b border-muted last:border-b-0'
+								className='flex-row items-center justify-between py-4 border-b border-gray-100 last:border-b-0'
 								onPress={item.action}
 							>
 								<View className='flex-row items-center'>
 									<Ionicons name={item.icon as any} size={24} color='#3D5AFE' />
 									<View className='ml-4'>
-										<Text className='text-base font-medium text-text-main'>
+										<Text className='text-base font-medium text-gray-900'>
 											{item.title}
 										</Text>
 										<Text className='text-sm text-gray-500'>

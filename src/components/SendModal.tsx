@@ -11,17 +11,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { USDCService } from '@/services/usdcService';
-import { TransactionService } from '@/services/transactionService';
-import { useBalanceStore } from '@/stores/balanceStore';
-import { useUserStore } from '@/stores/userStore';
-import UserSearch from '@/components/UserSearch';
-import { UserProfile } from '@/services/authService';
 
 interface SendModalProps {
 	visible: boolean;
 	onClose: () => void;
 	onSendComplete?: () => void;
+}
+
+// Mock user type
+interface UserProfile {
+	id: string;
+	firstName: string;
+	lastName: string;
+	email: string;
+	phone?: string;
+	username?: string;
 }
 
 export default function SendModal({
@@ -36,8 +40,15 @@ export default function SendModal({
 	const [isSending, setIsSending] = useState(false);
 	const [showUserSearch, setShowUserSearch] = useState(false);
 
-	const { usdcBalance, refreshAllBalances } = useBalanceStore();
-	const { user: currentUser } = useUserStore();
+	// Mock data
+	const mockBalance = '1,234.56';
+	const availableTags = [
+		'personal',
+		'business',
+		'food',
+		'transport',
+		'entertainment',
+	];
 
 	// Reset modal state when opened
 	useEffect(() => {
@@ -49,7 +60,6 @@ export default function SendModal({
 		}
 	}, [visible]);
 
-	// Handle send USDC
 	const handleSend = async () => {
 		if (!selectedUser) {
 			Alert.alert('Error', 'Please select a recipient');
@@ -61,144 +71,57 @@ export default function SendModal({
 			return;
 		}
 
-		const sendAmount = parseFloat(amount);
-		const currentBalance = parseFloat(usdcBalance);
+		setIsSending(true);
+		try {
+			// Move payment logic to services
+			console.log('Sending payment:', {
+				recipient: selectedUser,
+				amount: parseFloat(amount),
+				note,
+				tags: selectedTags,
+			});
 
-		if (sendAmount > currentBalance) {
-			Alert.alert('Error', 'Insufficient USDC balance');
-			return;
-		}
+			// Simulate API call
+			await new Promise((resolve) => setTimeout(resolve, 2000));
 
-		Alert.alert(
-			'Confirm Send',
-			`Send ${sendAmount} USDC to ${
-				selectedUser.firstName || selectedUser.email
-			}?`,
-			[
-				{ text: 'Cancel', style: 'cancel' },
-				{
-					text: 'Send',
-					onPress: async () => {
-						setIsSending(true);
-						try {
-							// Check if recipient has a wallet address
-							if (!selectedUser.walletAddress) {
-								Alert.alert(
-									'Error',
-									'Recipient does not have a wallet address. Please ask them to complete their wallet setup.'
-								);
-								return;
-							}
-
-							// Execute USDC transfer using TransactionService (handles authentication)
-							console.log(
-								`Transferring ${sendAmount} USDC to ${selectedUser.walletAddress}`
-							);
-
-							// Get current user's wallet address for the transaction
-							let currentUserAddress = currentUser?.walletAddress;
-
-							// If wallet address is not in user data, try to get it from Magic
-							if (!currentUserAddress) {
-								try {
-									console.log(
-										'🔍 [SendModal] Wallet address not in user data, getting from Magic...'
-									);
-									const { MagicService } = await import('@/hooks/magic');
-									const magicUserInfo = await MagicService.magic.user.getInfo();
-									currentUserAddress = magicUserInfo.publicAddress;
-									console.log(
-										'✅ [SendModal] Got wallet address from Magic:',
-										currentUserAddress
-									);
-								} catch (magicError) {
-									console.error(
-										'❌ [SendModal] Failed to get wallet from Magic:',
-										magicError
-									);
-								}
-							}
-
-							if (!currentUserAddress) {
-								Alert.alert(
-									'Error',
-									'Your wallet address is not available. Please try logging out and back in.'
-								);
-								return;
-							}
-
-							// Get current USDC balance
-							const currentBalance = await USDCService.getBalance(
-								currentUserAddress
-							);
-
-							// Use TransactionService which handles DID token authentication
-							const result = await TransactionService.executeTransfer(
-								selectedUser.walletAddress,
-								sendAmount.toString(),
-								currentUserAddress,
-								currentBalance,
-								note ||
-									`Payment to ${selectedUser.firstName} ${selectedUser.lastName}`,
-								selectedTags
-							);
-
-							if (!result.success) {
-								Alert.alert(
-									'Transfer Failed',
-									result.error || 'Unknown error occurred'
-								);
-								return;
-							}
-
-							console.log('USDC transfer transaction:', result.txHash);
-							console.log('USDC transfer confirmed');
-
-							// Backend payment record is already created by TransactionService
-							console.log('Backend payment record created:', result.paymentId);
-
-							Alert.alert(
-								'Success',
-								`Payment of ${sendAmount} USDC sent successfully!\n\nTransaction: ${result.txHash}`
-							);
-
-							// Refresh balances
-							await refreshAllBalances();
-
-							// Callback and close
+			Alert.alert(
+				'Payment Sent!',
+				`Successfully sent $${amount} to ${selectedUser.firstName} ${selectedUser.lastName}`,
+				[
+					{
+						text: 'OK',
+						onPress: () => {
 							onSendComplete?.();
 							onClose();
-						} catch (error) {
-							console.error('Error sending payment:', error);
-							let errorMessage = 'Failed to send payment. Please try again.';
-
-							// Provide more specific error messages
-							if (error.message.includes('insufficient funds')) {
-								errorMessage = 'Insufficient USDC balance or ETH for gas fees.';
-							} else if (
-								error.message.includes('rejected') ||
-								error.message.includes('denied')
-							) {
-								errorMessage = 'Transaction was cancelled by user.';
-							} else if (error.message.includes('gas')) {
-								errorMessage =
-									'Transaction failed due to gas estimation error.';
-							}
-
-							Alert.alert('Error', errorMessage);
-						} finally {
-							setIsSending(false);
-						}
+						},
 					},
-				},
-			]
-		);
+				]
+			);
+		} catch (error) {
+			console.error('Send payment error:', error);
+			Alert.alert('Error', 'Failed to send payment. Please try again.');
+		} finally {
+			setIsSending(false);
+		}
 	};
 
-	// Handle user selection from search
-	const handleUserSelect = (user: UserProfile) => {
-		setSelectedUser(user);
+	const handleUserSelect = () => {
+		// Mock user selection - move to actual user search
+		const mockUser: UserProfile = {
+			id: '1',
+			firstName: 'Sarah',
+			lastName: 'Wilson',
+			email: 'sarah.wilson@example.com',
+			username: 'sarahw',
+		};
+		setSelectedUser(mockUser);
 		setShowUserSearch(false);
+	};
+
+	const toggleTag = (tag: string) => {
+		setSelectedTags((prev) =>
+			prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+		);
 	};
 
 	return (
@@ -209,208 +132,156 @@ export default function SendModal({
 			onRequestClose={onClose}
 		>
 			<SafeAreaView className='flex-1 bg-white'>
-				{/* Header */}
-				<View className='flex-row items-center justify-between p-4 border-b border-gray-200'>
-					<TouchableOpacity onPress={onClose}>
-						<Ionicons name='close' size={24} color='#666' />
-					</TouchableOpacity>
-					<Text className='text-lg font-semibold text-gray-900'>Send USDC</Text>
-					<View style={{ width: 24 }} />
-				</View>
+				<ScrollView className='flex-1 px-6 py-4'>
+					{/* Header */}
+					<View className='flex-row items-center justify-between mb-6'>
+						<Text className='text-2xl font-bold text-gray-900'>Send Money</Text>
+						<TouchableOpacity onPress={onClose} className='p-2'>
+							<Ionicons name='close' size={24} color='#666' />
+						</TouchableOpacity>
+					</View>
 
-				<ScrollView className='flex-1 p-4'>
-					{/* Balance Info */}
-					<View className='p-4 mb-4 rounded-lg bg-gray-50'>
-						<Text className='text-sm text-gray-600'>Available Balance</Text>
-						<Text className='text-xl font-semibold text-gray-900'>
-							{parseFloat(usdcBalance).toFixed(2)} USDC
+					{/* Balance Display */}
+					<View className='p-4 mb-6 rounded-xl bg-blue-50'>
+						<Text className='text-sm text-blue-600'>Available Balance</Text>
+						<Text className='text-2xl font-bold text-blue-900'>
+							{mockBalance} USDC
 						</Text>
 					</View>
 
-					{/* Select Recipient */}
-					<View className='mb-4'>
-						<Text className='mb-2 text-sm font-medium text-gray-700'>
-							Recipient
+					{/* Recipient Selection */}
+					<View className='mb-6'>
+						<Text className='mb-3 text-lg font-semibold text-gray-900'>
+							Send To
 						</Text>
 						{selectedUser ? (
-							<View className='p-3 border border-blue-500 rounded-lg bg-blue-50'>
-								<View className='flex-row items-center justify-between'>
-									<View className='flex-row items-center flex-1'>
-										<View className='items-center justify-center w-10 h-10 mr-3 bg-blue-100 rounded-full'>
-											<Text className='font-semibold text-blue-600'>
-												{(
-													selectedUser.firstName ||
-													selectedUser.username ||
-													selectedUser.email ||
-													'?'
-												)
-													.charAt(0)
-													.toUpperCase()}
-											</Text>
-										</View>
-										<View className='flex-1'>
-											<Text className='font-medium text-gray-900'>
-												{selectedUser.firstName && selectedUser.lastName
-													? `${selectedUser.firstName} ${selectedUser.lastName}`
-													: selectedUser.username || selectedUser.email}
-											</Text>
-											{selectedUser.username && (
-												<Text className='text-sm text-blue-600'>
-													@{selectedUser.username}
-												</Text>
-											)}
-										</View>
-									</View>
-									<TouchableOpacity
-										onPress={() => setSelectedUser(null)}
-										className='p-1'
-									>
-										<Ionicons name='close-circle' size={20} color='#666' />
-									</TouchableOpacity>
+							<View className='flex-row items-center p-4 border border-gray-200 rounded-xl'>
+								<View className='items-center justify-center w-12 h-12 mr-4 bg-blue-100 rounded-full'>
+									<Text className='text-lg font-bold text-blue-600'>
+										{selectedUser.firstName[0]}
+									</Text>
 								</View>
+								<View className='flex-1'>
+									<Text className='text-base font-semibold text-gray-900'>
+										{selectedUser.firstName} {selectedUser.lastName}
+									</Text>
+									<Text className='text-sm text-gray-500'>
+										{selectedUser.email}
+									</Text>
+								</View>
+								<TouchableOpacity
+									onPress={() => setSelectedUser(null)}
+									className='p-2'
+								>
+									<Ionicons name='close-circle' size={20} color='#EF4444' />
+								</TouchableOpacity>
 							</View>
 						) : (
 							<TouchableOpacity
-								className='flex-row items-center px-3 py-3 border border-gray-300 rounded-lg bg-gray-50'
-								onPress={() => setShowUserSearch(true)}
+								onPress={handleUserSelect}
+								className='flex-row items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-xl'
 							>
-								<Ionicons name='search' size={20} color='#9CA3AF' />
-								<Text className='ml-2 text-base text-gray-500'>
-									Search for recipient...
+								<Ionicons name='person-add' size={24} color='#666' />
+								<Text className='ml-2 text-base text-gray-600'>
+									Select Recipient
 								</Text>
 							</TouchableOpacity>
 						)}
 					</View>
 
 					{/* Amount Input */}
-					{selectedUser && (
-						<>
-							<View className='mb-4'>
-								<Text className='mb-2 text-sm font-medium text-gray-700'>
-									Amount
-								</Text>
-								<View className='flex-row items-center px-3 py-2 bg-white border border-gray-300 rounded-lg'>
-									<TextInput
-										placeholder='0.00'
-										value={amount}
-										onChangeText={setAmount}
-										keyboardType='decimal-pad'
-										className='flex-1 text-base text-gray-900'
-										placeholderTextColor='#9CA3AF'
-									/>
-									<Text className='ml-2 text-sm font-medium text-gray-600'>
-										USDC
-									</Text>
-								</View>
-							</View>
+					<View className='mb-6'>
+						<Text className='mb-3 text-lg font-semibold text-gray-900'>
+							Amount
+						</Text>
+						<View className='flex-row items-center p-4 border border-gray-300 rounded-xl'>
+							<Text className='mr-3 text-xl font-bold text-blue-600'>$</Text>
+							<TextInput
+								placeholder='0.00'
+								value={amount}
+								onChangeText={setAmount}
+								keyboardType='decimal-pad'
+								className='flex-1 text-xl font-semibold'
+								placeholderTextColor='#9CA3AF'
+							/>
+							<Text className='ml-3 text-sm font-medium text-gray-500'>
+								USDC
+							</Text>
+						</View>
+					</View>
 
-							{/* Note Input */}
-							<View className='mb-4'>
-								<Text className='mb-2 text-sm font-medium text-gray-700'>
-									Note (Optional)
-								</Text>
-								<TextInput
-									placeholder='Add a note...'
-									value={note}
-									onChangeText={setNote}
-									multiline
-									numberOfLines={3}
-									className='px-3 py-2 text-base text-gray-900 bg-white border border-gray-300 rounded-lg'
-									placeholderTextColor='#9CA3AF'
-									textAlignVertical='top'
-								/>
-							</View>
+					{/* Note Input */}
+					<View className='mb-6'>
+						<Text className='mb-3 text-lg font-semibold text-gray-900'>
+							Note (Optional)
+						</Text>
+						<TextInput
+							placeholder="What's this for?"
+							value={note}
+							onChangeText={setNote}
+							multiline
+							numberOfLines={3}
+							className='p-4 text-base border border-gray-300 rounded-xl'
+							placeholderTextColor='#9CA3AF'
+							textAlignVertical='top'
+						/>
+					</View>
 
-							{/* Tag Selection */}
-							<View className='mb-6'>
-								<Text className='mb-2 text-sm font-medium text-gray-700'>
-									Tags
-								</Text>
-								<ScrollView
-									horizontal
-									showsHorizontalScrollIndicator={false}
-									className='flex-row'
+					{/* Tags */}
+					<View className='mb-8'>
+						<Text className='mb-3 text-lg font-semibold text-gray-900'>
+							Tags
+						</Text>
+						<View className='flex-row flex-wrap gap-2'>
+							{availableTags.map((tag) => (
+								<TouchableOpacity
+									key={tag}
+									onPress={() => toggleTag(tag)}
+									className={`px-4 py-2 rounded-full ${
+										selectedTags.includes(tag) ? 'bg-blue-600' : 'bg-gray-200'
+									}`}
 								>
-									{[
-										'personal',
-										'food',
-										'entertainment',
-										'transportation',
-										'shopping',
-										'rent',
-										'savings',
-									].map((tag) => (
-										<TouchableOpacity
-											key={tag}
-											onPress={() => {
-												if (selectedTags.includes(tag)) {
-													setSelectedTags(
-														selectedTags.filter((t) => t !== tag)
-													);
-												} else {
-													setSelectedTags([...selectedTags, tag]);
-												}
-											}}
-											className={`mr-2 px-3 py-2 rounded-full border ${
-												selectedTags.includes(tag)
-													? 'bg-blue-500 border-blue-500'
-													: 'bg-white border-gray-300'
-											}`}
-										>
-											<Text
-												className={`text-sm font-medium ${
-													selectedTags.includes(tag)
-														? 'text-white'
-														: 'text-gray-700'
-												}`}
-											>
-												{tag.charAt(0).toUpperCase() + tag.slice(1)}
-											</Text>
-										</TouchableOpacity>
-									))}
-								</ScrollView>
+									<Text
+										className={`text-sm font-medium capitalize ${
+											selectedTags.includes(tag)
+												? 'text-white'
+												: 'text-gray-700'
+										}`}
+									>
+										{tag}
+									</Text>
+								</TouchableOpacity>
+							))}
+						</View>
+					</View>
+
+					{/* Send Button */}
+					<TouchableOpacity
+						onPress={handleSend}
+						disabled={!selectedUser || !amount || isSending}
+						className={`p-4 rounded-xl ${
+							selectedUser && amount && !isSending
+								? 'bg-green-600'
+								: 'bg-gray-300'
+						}`}
+					>
+						{isSending ? (
+							<View className='flex-row items-center justify-center'>
+								<ActivityIndicator size='small' color='white' />
+								<Text className='ml-2 text-lg font-semibold text-white'>
+									Sending...
+								</Text>
 							</View>
-
-							{/* Send Button */}
-							<TouchableOpacity
-								className={`p-4 rounded-lg ${
-									isSending ? 'bg-gray-400' : 'bg-green-600'
-								}`}
-								onPress={handleSend}
-								disabled={isSending}
-							>
-								<View className='flex-row items-center justify-center'>
-									{isSending ? (
-										<>
-											<ActivityIndicator size='small' color='white' />
-											<Text className='ml-2 font-semibold text-white'>
-												Sending...
-											</Text>
-										</>
-									) : (
-										<>
-											<Ionicons name='send' size={20} color='white' />
-											<Text className='ml-2 font-semibold text-white'>
-												Send {amount} USDC
-											</Text>
-										</>
-									)}
-								</View>
-							</TouchableOpacity>
-						</>
-					)}
+						) : (
+							<View className='flex-row items-center justify-center'>
+								<Ionicons name='send' size={20} color='white' />
+								<Text className='ml-2 text-lg font-semibold text-white'>
+									Send {amount ? `$${amount}` : 'Money'}
+								</Text>
+							</View>
+						)}
+					</TouchableOpacity>
 				</ScrollView>
-
-				{/* User Search Modal */}
-				<UserSearch
-					visible={showUserSearch}
-					onClose={() => setShowUserSearch(false)}
-					onUserSelect={handleUserSelect}
-					title='Select Recipient'
-					placeholder='Search by name or username...'
-					excludeCurrentUser={true}
-					minSearchLength={3}
-				/>
 			</SafeAreaView>
 		</Modal>
 	);

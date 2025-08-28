@@ -16,14 +16,23 @@ import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 const styles = StyleSheet.create({
 	paymentButton: {
 		position: 'absolute',
-		top: -30,
+		top: -35,
+		left: '50%',
+		marginLeft: -35, // Half of the button width (70/2)
 		backgroundColor: '#4F46E5',
-		borderRadius: 100,
+		borderRadius: 35,
 		width: 70,
 		height: 70,
 		alignItems: 'center',
 		justifyContent: 'center',
-		boxShadow: '0px 4px 6px rgba(0, 0, 0, 0.2)',
+		shadowColor: '#000',
+		shadowOffset: {
+			width: 0,
+			height: 4,
+		},
+		shadowOpacity: 0.2,
+		shadowRadius: 6,
+		elevation: 8, // For Android shadow
 	},
 });
 

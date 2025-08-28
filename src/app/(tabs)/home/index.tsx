@@ -9,18 +9,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { useRef, useState, useEffect } from 'react';
-import { BottomSheetModal } from '@gorhom/bottom-sheet';
-import SendBottomSheet from '../../../components/SendBottomSheet';
-import RequestBottomSheet from '@/components/RequestBottomSheet';
-import SplitBottomSheet from '@/components/SplitBottomSheet';
-import SendModal from '@/components/SendModal';
-import { useBalanceStore } from '@/stores/balanceStore';
-import { PaymentService } from '@/services/paymentService';
-import { useUserStore } from '@/stores/userStore';
+import { useState } from 'react';
 
-// Mock data for recent activity with random avatar URLs
-const recentActivity = [
+// Mock data for display purposes
+const mockUser = {
+	firstName: 'John',
+	lastName: 'Doe',
+};
+
+const mockBalances = {
+	usdcBalance: '1,234.56',
+	ethBalance: '0.5432',
+	walletAddress: '0x1234...5678',
+};
+
+const mockWeeklyStats = {
+	sent: 245.5,
+	received: 189.25,
+	transactions: 12,
+};
+
+const mockRecentActivity = [
 	{
 		id: '1',
 		name: 'Sarah Wilson',
@@ -48,140 +57,27 @@ const recentActivity = [
 		note: 'Uber ride 🚕',
 		time: '1 day ago',
 	},
-	{
-		id: '4',
-		name: 'John Smith',
-		avatar: 'https://i.pravatar.cc/150?img=4',
-		amount: 30.0,
-		type: 'received',
-		note: 'Movie tickets 🎬',
-		time: '2 days ago',
-	},
 ];
 
 export default function HomeScreen() {
-	// Bottom sheet refs
-	const sendBottomSheetRef = useRef<BottomSheetModal>(null);
-	const requestBottomSheetRef = useRef<BottomSheetModal>(null);
-	const splitBottomSheetRef = useRef<BottomSheetModal>(null);
-	const { user } = useUserStore();
+	const [isLoading, setIsLoading] = useState(false);
 
-	// State for recent activity and send modal
-	const [activityList, setActivityList] = useState(recentActivity);
-	const [showSendModal, setShowSendModal] = useState(false);
-	const [weeklyStats, setWeeklyStats] = useState({
-		sent: 0,
-		received: 0,
-		transactions: 0,
-	});
-
-	// Balance store
-	const {
-		usdcBalance,
-		ethBalance,
-		usdcLoading,
-		ethLoading,
-		fetchAllBalances,
-		refreshAllBalances,
-		walletAddress,
-	} = useBalanceStore();
-
-	// Load data on component mount
-	useEffect(() => {
-		fetchAllBalances();
-		loadPaymentStats();
-	}, []);
-
-	// Load payment statistics
-	const loadPaymentStats = async () => {
-		try {
-			const stats = await PaymentService.getPaymentStats();
-			// Process stats to get weekly data
-			setWeeklyStats({
-				sent: stats.data?.totalSent || 0,
-				received: stats.data?.totalReceived || 0,
-				transactions: stats.data?.totalTransactions || 0,
-			});
-		} catch (error) {
-			console.error('Error loading payment stats:', error);
-		}
+	const handleSend = () => {
+		console.log('Send button pressed - move logic to services');
 	};
 
-	// Handle send money
-	const handleSend = async (
-		amount: number,
-		recipients: string[],
-		note: string
-	) => {
-		const recipientNames = recipients.join(', ');
-		const newActivity = {
-			id: Date.now().toString(),
-			name:
-				recipients.length > 1 ? `${recipients.length} people` : recipients[0],
-			avatar:
-				'https://i.pravatar.cc/150?img=' + Math.floor(Math.random() * 10 + 1),
-			amount: amount,
-			type: 'sent' as const,
-			note: note || 'Payment',
-			time: 'Just now',
-		};
-		setActivityList([newActivity, ...activityList]);
-		console.log('Sent $' + amount + ' to ' + recipientNames);
-
-		// Refresh balances after payment
-		await refreshAllBalances();
-		await loadPaymentStats();
+	const handleRequest = () => {
+		console.log('Request button pressed - move logic to services');
 	};
 
-	// Handle request money
-	const handleRequest = (
-		amount: number,
-		requesters: string[],
-		note: string
-	) => {
-		const requesterNames = requesters.join(', ');
-		const newActivity = {
-			id: Date.now().toString(),
-			name:
-				requesters.length > 1 ? `${requesters.length} people` : requesters[0],
-			avatar:
-				'https://i.pravatar.cc/150?img=' + Math.floor(Math.random() * 10 + 1),
-			amount: amount,
-			type: 'received' as const,
-			note: note || 'Request',
-			time: 'Just now',
-		};
-		setActivityList([newActivity, ...activityList]);
-		console.log('Requested $' + amount + ' from ' + requesterNames);
+	const handleSplit = () => {
+		console.log('Split button pressed - move logic to services');
 	};
 
-	// Handle split expense
-	const handleSplit = (
-		amount: number,
-		groupName: string,
-		note: string,
-		splitMethod: string
-	) => {
-		const newActivity = {
-			id: Date.now().toString(),
-			name: groupName,
-			avatar:
-				'https://i.pravatar.cc/150?img=' + Math.floor(Math.random() * 10 + 1),
-			amount: amount,
-			type: 'sent' as const,
-			note: note || 'Split expense',
-			time: 'Just now',
-		};
-		setActivityList([newActivity, ...activityList]);
-		console.log(
-			'Split $' +
-				amount +
-				' with ' +
-				groupName +
-				' using ' +
-				splitMethod +
-				' method'
-		);
+	const handleRefresh = () => {
+		console.log('Refresh button pressed - move logic to services');
+		setIsLoading(true);
+		setTimeout(() => setIsLoading(false), 1000);
 	};
 
 	return (
@@ -195,10 +91,10 @@ export default function HomeScreen() {
 				<View className='mb-6'>
 					<View className='flex-row items-center justify-between mb-2'>
 						<View>
-							<Text className='text-2xl font-bold text-text-main'>
-								Welcome back, {user?.firstName || 'User'}!
+							<Text className='text-2xl font-bold text-gray-900'>
+								Welcome back, {mockUser.firstName}!
 							</Text>
-							<Text className='text-base text-text-main'>
+							<Text className='text-base text-gray-600'>
 								Here is your summary for the week.
 							</Text>
 						</View>
@@ -226,9 +122,7 @@ export default function HomeScreen() {
 						<View className='flex-1'>
 							<View className='flex-row items-center mb-2'>
 								<Text className='text-2xl font-bold text-white'>
-									{usdcLoading
-										? '...'
-										: `${parseFloat(usdcBalance).toFixed(2)}`}
+									{mockBalances.usdcBalance}
 								</Text>
 								<Text
 									style={{ color: 'rgba(255, 255, 255, 0.8)' }}
@@ -236,17 +130,10 @@ export default function HomeScreen() {
 								>
 									USDC
 								</Text>
-								{usdcLoading && (
-									<ActivityIndicator
-										size='small'
-										color='white'
-										className='ml-2'
-									/>
-								)}
 							</View>
 							<View className='flex-row items-center'>
 								<Text className='text-lg font-semibold text-white'>
-									{ethLoading ? '...' : `${parseFloat(ethBalance).toFixed(4)}`}
+									{mockBalances.ethBalance}
 								</Text>
 								<Text
 									style={{ color: 'rgba(255, 255, 255, 0.8)' }}
@@ -254,22 +141,15 @@ export default function HomeScreen() {
 								>
 									ETH
 								</Text>
-								{ethLoading && (
-									<ActivityIndicator
-										size='small'
-										color='white'
-										className='ml-2'
-									/>
-								)}
 							</View>
 						</View>
 						<TouchableOpacity
 							className='px-4 py-2 bg-white rounded-full'
-							onPress={() => setShowSendModal(true)}
+							onPress={handleSend}
 						>
 							<View className='flex-row items-center'>
 								<Ionicons name='send' size={16} color='#3D5AFE' />
-								<Text className='ml-1 text-sm font-medium text-primary-blue'>
+								<Text className='ml-1 text-sm font-medium text-blue-600'>
 									Send
 								</Text>
 							</View>
@@ -281,35 +161,43 @@ export default function HomeScreen() {
 							style={{ color: 'rgba(255, 255, 255, 0.9)' }}
 							className='ml-2 text-sm'
 						>
-							{walletAddress
-								? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-								: 'Loading wallet...'}
+							{mockBalances.walletAddress}
 						</Text>
 					</View>
 				</LinearGradient>
 
 				{/* Quick Stats */}
 				<View className='my-6'>
-					<Text className='mb-3 text-xl font-semibold text-text-main'>
-						This Week
-					</Text>
+					<View className='flex-row items-center justify-between mb-3'>
+						<Text className='text-xl font-semibold text-gray-900'>
+							This Week
+						</Text>
+						<TouchableOpacity onPress={handleRefresh}>
+							<Ionicons
+								name='refresh'
+								size={20}
+								color='#3D5AFE'
+								style={{ opacity: isLoading ? 0.5 : 1 }}
+							/>
+						</TouchableOpacity>
+					</View>
 					<View className='p-6 bg-white shadow-sm rounded-2xl'>
 						<View className='flex-row justify-between'>
 							<View className='items-center'>
-								<Text className='text-2xl font-bold text-primary-blue'>
-									${weeklyStats.sent.toFixed(2)}
+								<Text className='text-2xl font-bold text-blue-600'>
+									${mockWeeklyStats.sent.toFixed(2)}
 								</Text>
 								<Text className='text-sm text-gray-500'>Sent</Text>
 							</View>
 							<View className='items-center'>
-								<Text className='text-2xl font-bold text-primary-green'>
-									${weeklyStats.received.toFixed(2)}
+								<Text className='text-2xl font-bold text-green-600'>
+									${mockWeeklyStats.received.toFixed(2)}
 								</Text>
 								<Text className='text-sm text-gray-500'>Received</Text>
 							</View>
 							<View className='items-center'>
-								<Text className='text-2xl font-bold text-primary-blue'>
-									{weeklyStats.transactions}
+								<Text className='text-2xl font-bold text-blue-600'>
+									{mockWeeklyStats.transactions}
 								</Text>
 								<Text className='text-sm text-gray-500'>Transactions</Text>
 							</View>
@@ -319,42 +207,40 @@ export default function HomeScreen() {
 
 				{/* Quick Actions */}
 				<View className='mb-6'>
-					<Text className='mb-3 text-xl font-semibold text-text-main'>
+					<Text className='mb-3 text-xl font-semibold text-gray-900'>
 						Quick Actions
 					</Text>
 					<View className='flex-row justify-between space-x-4 bg-white rounded-2xl'>
 						<TouchableOpacity
 							className='items-center flex-1 py-6 shadow-sm rounded-2xl'
-							onPress={() => setShowSendModal(true)}
+							onPress={handleSend}
 						>
-							<View className='items-center justify-center w-12 h-12 mb-3 rounded-full bg-primary-blue'>
+							<View className='items-center justify-center w-12 h-12 mb-3 rounded-full bg-blue-600'>
 								<Ionicons name='arrow-up' size={24} color='white' />
 							</View>
-							<Text className='text-base font-medium text-text-main'>Send</Text>
+							<Text className='text-base font-medium text-gray-900'>Send</Text>
 						</TouchableOpacity>
 
 						<TouchableOpacity
 							className='items-center flex-1 py-6 shadow-sm rounded-2xl'
-							onPress={() => requestBottomSheetRef.current?.present()}
+							onPress={handleRequest}
 						>
-							<View className='items-center justify-center w-12 h-12 mb-3 rounded-full bg-primary-green'>
+							<View className='items-center justify-center w-12 h-12 mb-3 rounded-full bg-green-600'>
 								<Ionicons name='arrow-down' size={24} color='white' />
 							</View>
-							<Text className='text-base font-medium text-text-main'>
+							<Text className='text-base font-medium text-gray-900'>
 								Request
 							</Text>
 						</TouchableOpacity>
 
 						<TouchableOpacity
 							className='items-center flex-1 py-6 shadow-sm rounded-2xl'
-							onPress={() => splitBottomSheetRef.current?.present()}
+							onPress={handleSplit}
 						>
 							<View className='items-center justify-center w-12 h-12 mb-3 bg-gray-200 rounded-full'>
 								<Ionicons name='people' size={24} color='#3D5AFE' />
 							</View>
-							<Text className='text-base font-medium text-text-main'>
-								Split
-							</Text>
+							<Text className='text-base font-medium text-gray-900'>Split</Text>
 						</TouchableOpacity>
 					</View>
 				</View>
@@ -362,20 +248,20 @@ export default function HomeScreen() {
 				{/* Recent Activity */}
 				<View className='p-6 mb-6 bg-white shadow-sm rounded-2xl'>
 					<View className='flex-row items-center justify-between mb-6'>
-						<Text className='text-xl font-semibold text-text-main'>
+						<Text className='text-xl font-semibold text-gray-900'>
 							Recent Activity
 						</Text>
 						<TouchableOpacity>
-							<Text className='text-base font-medium text-primary-blue'>
+							<Text className='text-base font-medium text-blue-600'>
 								View All
 							</Text>
 						</TouchableOpacity>
 					</View>
 
-					{activityList.map((activity) => (
+					{mockRecentActivity.map((activity) => (
 						<View
 							key={activity.id}
-							className='flex-row items-center justify-between py-4 border-b border-muted last:border-b-0'
+							className='flex-row items-center justify-between py-4 border-b border-gray-100 last:border-b-0'
 						>
 							<View className='flex-row items-center flex-1'>
 								<Image
@@ -391,7 +277,7 @@ export default function HomeScreen() {
 									transition={200}
 								/>
 								<View className='flex-1'>
-									<Text className='text-base font-medium text-text-main'>
+									<Text className='text-base font-medium text-gray-900'>
 										{activity.name}
 									</Text>
 									<Text className='text-sm text-gray-500'>
@@ -402,9 +288,7 @@ export default function HomeScreen() {
 							<View className='items-end'>
 								<Text
 									className={`font-semibold text-xl ${
-										activity.type === 'sent'
-											? 'text-red-500'
-											: 'text-primary-green'
+										activity.type === 'sent' ? 'text-red-500' : 'text-green-600'
 									}`}
 								>
 									{activity.type === 'sent' ? '-' : '+'}${activity.amount}
@@ -443,34 +327,12 @@ export default function HomeScreen() {
 			</ScrollView>
 
 			{/* Floating Action Button */}
-			<TouchableOpacity className='absolute items-center justify-center w-16 h-16 rounded-full shadow-lg bottom-8 right-6 bg-primary-blue'>
+			<TouchableOpacity
+				className='absolute items-center justify-center w-16 h-16 rounded-full shadow-lg bottom-8 right-6 bg-blue-600'
+				onPress={handleSend}
+			>
 				<Ionicons name='add' size={36} color='white' />
 			</TouchableOpacity>
-
-			{/* Bottom Sheets */}
-			<SendBottomSheet
-				bottomSheetModalRef={sendBottomSheetRef}
-				onSend={handleSend}
-			/>
-			<RequestBottomSheet
-				bottomSheetModalRef={requestBottomSheetRef}
-				onRequest={handleRequest}
-			/>
-			<SplitBottomSheet
-				bottomSheetModalRef={splitBottomSheetRef}
-				onSplit={handleSplit}
-			/>
-
-			{/* Send Modal */}
-			<SendModal
-				visible={showSendModal}
-				onClose={() => setShowSendModal(false)}
-				onSendComplete={() => {
-					// Refresh balances and stats after sending
-					fetchAllBalances();
-					loadPaymentStats();
-				}}
-			/>
 		</SafeAreaView>
 	);
 }

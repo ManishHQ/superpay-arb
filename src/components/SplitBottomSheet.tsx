@@ -5,54 +5,14 @@ import {
 	TextInput,
 	TouchableOpacity,
 	ScrollView,
+	Alert,
+	ActivityIndicator,
 } from 'react-native';
 import { BottomSheetModal, BottomSheetView } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Image } from 'expo-image';
-
-// Mock groups data
-const groups = [
-	{
-		id: '1',
-		name: 'Roommates',
-		members: 4,
-		avatar: 'https://i.pravatar.cc/150?img=5',
-		membersList: ['Alex', 'Sarah', 'Mike', 'Emma'],
-	},
-	{
-		id: '2',
-		name: 'Weekend Trip',
-		members: 6,
-		avatar: 'https://i.pravatar.cc/150?img=6',
-		membersList: ['Alex', 'Sarah', 'Mike', 'Emma', 'John', 'Lisa'],
-	},
-	{
-		id: '3',
-		name: 'Birthday Party',
-		members: 8,
-		avatar: 'https://i.pravatar.cc/150?img=7',
-		membersList: [
-			'Alex',
-			'Sarah',
-			'Mike',
-			'Emma',
-			'John',
-			'Lisa',
-			'Tom',
-			'Anna',
-		],
-	},
-	{
-		id: '4',
-		name: 'Coffee Club',
-		members: 3,
-		avatar: 'https://i.pravatar.cc/150?img=8',
-		membersList: ['Alex', 'Sarah', 'Mike'],
-	},
-];
 
 interface SplitBottomSheetProps {
-	bottomSheetModalRef: React.RefObject<BottomSheetModal | null>;
+	bottomSheetModalRef: React.RefObject<BottomSheetModal>;
 	onSplit: (
 		amount: number,
 		groupName: string,
@@ -61,36 +21,90 @@ interface SplitBottomSheetProps {
 	) => void;
 }
 
+const mockGroups = [
+	{ id: '1', name: 'Dinner Squad', members: 4 },
+	{ id: '2', name: 'Movie Night', members: 3 },
+	{ id: '3', name: 'Weekend Trip', members: 6 },
+];
+
+const splitMethods = [
+	{
+		id: 'equal',
+		name: 'Split Equally',
+		description: 'Divide amount equally among all members',
+	},
+	{
+		id: 'custom',
+		name: 'Custom Split',
+		description: 'Set custom amounts for each person',
+	},
+	{
+		id: 'percentage',
+		name: 'By Percentage',
+		description: 'Split based on percentages',
+	},
+];
+
 export default function SplitBottomSheet({
 	bottomSheetModalRef,
 	onSplit,
 }: SplitBottomSheetProps) {
+	const [selectedGroup, setSelectedGroup] = useState<string>('');
 	const [amount, setAmount] = useState('');
-	const [selectedGroup, setSelectedGroup] = useState<any>(null);
 	const [note, setNote] = useState('');
-	const [splitMethod, setSplitMethod] = useState('equal'); // 'equal' or 'custom'
+	const [splitMethod, setSplitMethod] = useState('equal');
+	const [isSplitting, setIsSplitting] = useState(false);
 
-	// Variables
-	const snapPoints = useMemo(() => ['25%', '90%'], []);
+	const snapPoints = useMemo(() => ['25%', '50%', '90%'], []);
 
-	// Callbacks
 	const handleSheetChanges = useCallback((index: number) => {
 		console.log('handleSheetChanges', index);
 	}, []);
 
-	const handleSplit = () => {
-		if (!amount || !selectedGroup) return;
+	const handleSplit = async () => {
+		if (!selectedGroup) {
+			Alert.alert('Error', 'Please select a group');
+			return;
+		}
 
-		onSplit(parseFloat(amount), selectedGroup.name, note, splitMethod);
-		setAmount('');
-		setSelectedGroup(null);
-		setNote('');
-		setSplitMethod('equal');
-		bottomSheetModalRef.current?.dismiss();
+		if (!amount || parseFloat(amount) <= 0) {
+			Alert.alert('Error', 'Please enter a valid amount');
+			return;
+		}
+
+		setIsSplitting(true);
+		try {
+			const group = mockGroups.find((g) => g.id === selectedGroup);
+			const groupName = group?.name || 'Unknown Group';
+			const selectedMethod =
+				splitMethods.find((m) => m.id === splitMethod)?.name || 'Equal Split';
+
+			console.log('Splitting expense:', {
+				amount: parseFloat(amount),
+				groupName,
+				note,
+				splitMethod: selectedMethod,
+			});
+
+			// Simulate API call
+			await new Promise((resolve) => setTimeout(resolve, 1500));
+
+			onSplit(parseFloat(amount), groupName, note, selectedMethod);
+
+			// Reset form
+			setSelectedGroup('');
+			setAmount('');
+			setNote('');
+			setSplitMethod('equal');
+
+			bottomSheetModalRef.current?.dismiss();
+		} catch (error) {
+			console.error('Split error:', error);
+			Alert.alert('Error', 'Failed to split expense. Please try again.');
+		} finally {
+			setIsSplitting(false);
+		}
 	};
-
-	const splitAmount =
-		selectedGroup && amount ? parseFloat(amount) / selectedGroup.members : 0;
 
 	return (
 		<BottomSheetModal
@@ -98,17 +112,16 @@ export default function SplitBottomSheet({
 			index={1}
 			snapPoints={snapPoints}
 			onChange={handleSheetChanges}
-			backgroundStyle={{ backgroundColor: 'white' }}
-			handleIndicatorStyle={{ backgroundColor: '#E0E0E0' }}
 		>
-			<BottomSheetView className='flex-1 px-6'>
+			<BottomSheetView className='flex-1 px-6 py-4'>
 				{/* Header */}
 				<View className='flex-row items-center justify-between mb-6'>
-					<Text className='text-2xl font-bold text-text-main'>
+					<Text className='text-2xl font-bold text-gray-900'>
 						Split Expense
 					</Text>
 					<TouchableOpacity
 						onPress={() => bottomSheetModalRef.current?.dismiss()}
+						className='p-2'
 					>
 						<Ionicons name='close' size={24} color='#666' />
 					</TouchableOpacity>
@@ -116,182 +129,174 @@ export default function SplitBottomSheet({
 
 				{/* Amount Input */}
 				<View className='mb-6'>
-					<Text className='mb-2 text-base font-medium text-gray-600'>
+					<Text className='mb-3 text-lg font-semibold text-gray-900'>
 						Total Amount
 					</Text>
-					<View className='flex-row items-center px-4 py-3 border border-gray-300 rounded-2xl'>
-						<Text className='mr-2 text-2xl font-bold text-text-main'>$</Text>
+					<View className='flex-row items-center p-4 border border-gray-300 rounded-xl'>
+						<Text className='mr-3 text-xl font-bold text-purple-600'>$</Text>
 						<TextInput
+							placeholder='0.00'
 							value={amount}
 							onChangeText={setAmount}
-							placeholder='0.00'
 							keyboardType='decimal-pad'
-							className='flex-1 text-2xl font-bold text-text-main'
-							placeholderTextColor='#999'
+							className='flex-1 text-xl font-semibold'
+							placeholderTextColor='#9CA3AF'
 						/>
+						<Text className='ml-3 text-sm font-medium text-gray-500'>USD</Text>
 					</View>
 				</View>
 
 				{/* Group Selection */}
 				<View className='mb-6'>
-					<Text className='mb-2 text-base font-medium text-gray-600'>
-						Split with Group
+					<Text className='mb-3 text-lg font-semibold text-gray-900'>
+						Select Group
 					</Text>
-
-					{/* Selected Group */}
-					{selectedGroup && (
-						<View className='flex-row items-center p-4 mb-4 bg-primary-blue rounded-2xl'>
-							<Image
-								source={{ uri: selectedGroup.avatar }}
-								style={{
-									width: 40,
-									height: 40,
-									borderRadius: 20,
-									marginRight: 12,
-								}}
-								contentFit='cover'
-								placeholder='👥'
-								transition={200}
-							/>
-							<View className='flex-1'>
-								<Text className='text-base font-medium text-white'>
-									{selectedGroup.name}
-								</Text>
-								<Text className='text-sm text-blue-100'>
-									{selectedGroup.members} members
-								</Text>
-							</View>
-							<TouchableOpacity onPress={() => setSelectedGroup(null)}>
-								<Ionicons name='close-circle' size={24} color='white' />
-							</TouchableOpacity>
-						</View>
-					)}
-
-					{/* Group List */}
-					<ScrollView className='max-h-32' showsVerticalScrollIndicator={false}>
-						{groups.map((group) => (
-							<TouchableOpacity
-								key={group.id}
-								className='flex-row items-center p-3 border-b border-gray-100 last:border-b-0'
-								onPress={() => setSelectedGroup(group)}
-							>
-								<Image
-									source={{ uri: group.avatar }}
-									style={{
-										width: 40,
-										height: 40,
-										borderRadius: 20,
-										marginRight: 12,
-									}}
-									contentFit='cover'
-									placeholder='👥'
-									transition={200}
-								/>
-								<View className='flex-1'>
-									<Text className='text-base font-medium text-text-main'>
+					<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+						<View className='flex-row gap-3'>
+							{mockGroups.map((group) => (
+								<TouchableOpacity
+									key={group.id}
+									onPress={() => setSelectedGroup(group.id)}
+									className={`p-4 rounded-xl border-2 min-w-[120px] ${
+										selectedGroup === group.id
+											? 'border-purple-500 bg-purple-50'
+											: 'border-gray-200 bg-white'
+									}`}
+								>
+									<Text
+										className={`font-semibold text-center ${
+											selectedGroup === group.id
+												? 'text-purple-900'
+												: 'text-gray-900'
+										}`}
+									>
 										{group.name}
 									</Text>
-									<Text className='text-sm text-gray-500'>
+									<Text
+										className={`text-sm text-center mt-1 ${
+											selectedGroup === group.id
+												? 'text-purple-600'
+												: 'text-gray-500'
+										}`}
+									>
 										{group.members} members
 									</Text>
-								</View>
-								<Ionicons name='chevron-forward' size={20} color='#666' />
-							</TouchableOpacity>
-						))}
+								</TouchableOpacity>
+							))}
+						</View>
 					</ScrollView>
 				</View>
 
 				{/* Split Method */}
 				<View className='mb-6'>
-					<Text className='mb-2 text-base font-medium text-gray-600'>
+					<Text className='mb-3 text-lg font-semibold text-gray-900'>
 						Split Method
 					</Text>
-					<View className='flex-row space-x-3'>
+					{splitMethods.map((method) => (
 						<TouchableOpacity
-							className={`flex-1 py-3 rounded-2xl border-2 ${
-								splitMethod === 'equal'
-									? 'border-primary-blue bg-blue-50'
-									: 'border-gray-300'
+							key={method.id}
+							onPress={() => setSplitMethod(method.id)}
+							className={`flex-row items-center p-4 mb-2 border rounded-xl ${
+								splitMethod === method.id
+									? 'border-purple-500 bg-purple-50'
+									: 'border-gray-200 bg-white'
 							}`}
-							onPress={() => setSplitMethod('equal')}
 						>
-							<Text
-								className={`text-center font-medium ${
-									splitMethod === 'equal'
-										? 'text-primary-blue'
-										: 'text-gray-600'
-								}`}
-							>
-								Equal Split
-							</Text>
+							<View className='flex-1'>
+								<Text
+									className={`font-semibold ${
+										splitMethod === method.id
+											? 'text-purple-900'
+											: 'text-gray-900'
+									}`}
+								>
+									{method.name}
+								</Text>
+								<Text
+									className={`text-sm ${
+										splitMethod === method.id
+											? 'text-purple-600'
+											: 'text-gray-500'
+									}`}
+								>
+									{method.description}
+								</Text>
+							</View>
+							{splitMethod === method.id && (
+								<Ionicons name='checkmark-circle' size={24} color='#8B5CF6' />
+							)}
 						</TouchableOpacity>
-						<TouchableOpacity
-							className={`flex-1 py-3 rounded-2xl border-2 ${
-								splitMethod === 'custom'
-									? 'border-primary-blue bg-blue-50'
-									: 'border-gray-300'
-							}`}
-							onPress={() => setSplitMethod('custom')}
-						>
-							<Text
-								className={`text-center font-medium ${
-									splitMethod === 'custom'
-										? 'text-primary-blue'
-										: 'text-gray-600'
-								}`}
-							>
-								Custom Split
-							</Text>
-						</TouchableOpacity>
-					</View>
+					))}
 				</View>
-
-				{/* Split Preview */}
-				{selectedGroup && amount && (
-					<View className='p-4 mb-6 bg-gray-50 rounded-2xl'>
-						<Text className='mb-2 text-base font-medium text-gray-600'>
-							Split Preview
-						</Text>
-						<Text className='text-lg font-semibold text-text-main'>
-							${splitAmount.toFixed(2)} per person
-						</Text>
-						<Text className='mt-1 text-sm text-gray-500'>
-							{selectedGroup.members} people × ${splitAmount.toFixed(2)} = $
-							{amount}
-						</Text>
-					</View>
-				)}
 
 				{/* Note Input */}
 				<View className='mb-6'>
-					<Text className='mb-2 text-base font-medium text-gray-600'>
+					<Text className='mb-3 text-lg font-semibold text-gray-900'>
 						Note (Optional)
 					</Text>
 					<TextInput
+						placeholder='What was this expense for?'
 						value={note}
 						onChangeText={setNote}
-						placeholder="What's this expense for?"
-						className='px-4 py-3 text-base border border-gray-300 rounded-2xl text-text-main'
-						placeholderTextColor='#999'
 						multiline
+						numberOfLines={2}
+						className='p-4 text-base border border-gray-300 rounded-xl'
+						placeholderTextColor='#9CA3AF'
+						textAlignVertical='top'
 					/>
 				</View>
 
+				{/* Preview */}
+				{selectedGroup && amount && (
+					<View className='p-4 mb-6 rounded-xl bg-purple-50'>
+						<Text className='text-sm text-purple-600'>Preview:</Text>
+						<Text className='font-medium text-purple-900'>
+							${amount} split{' '}
+							{splitMethods
+								.find((m) => m.id === splitMethod)
+								?.name.toLowerCase()}{' '}
+							among {
+								mockGroups.find((g) => g.id === selectedGroup)?.members
+							}{' '}
+							members
+						</Text>
+						{splitMethod === 'equal' && (
+							<Text className='text-sm text-purple-600'>
+								Each person pays: $
+								{(
+									parseFloat(amount) /
+									(mockGroups.find((g) => g.id === selectedGroup)?.members || 1)
+								).toFixed(2)}
+							</Text>
+						)}
+					</View>
+				)}
+
 				{/* Split Button */}
 				<TouchableOpacity
-					className={`py-4 rounded-2xl items-center ${
-						amount && selectedGroup ? 'bg-primary-blue' : 'bg-gray-300'
-					}`}
 					onPress={handleSplit}
-					disabled={!amount || !selectedGroup}
+					disabled={!selectedGroup || !amount || isSplitting}
+					className={`p-4 rounded-xl ${
+						selectedGroup && amount && !isSplitting
+							? 'bg-purple-600'
+							: 'bg-gray-300'
+					}`}
 				>
-					<Text
-						className={`text-lg font-semibold ${
-							amount && selectedGroup ? 'text-white' : 'text-gray-500'
-						}`}
-					>
-						Split ${amount || '0.00'}
-					</Text>
+					{isSplitting ? (
+						<View className='flex-row items-center justify-center'>
+							<ActivityIndicator size='small' color='white' />
+							<Text className='ml-2 text-lg font-semibold text-white'>
+								Splitting...
+							</Text>
+						</View>
+					) : (
+						<View className='flex-row items-center justify-center'>
+							<Ionicons name='people' size={20} color='white' />
+							<Text className='ml-2 text-lg font-semibold text-white'>
+								Split {amount ? `$${amount}` : 'Expense'}
+							</Text>
+						</View>
+					)}
 				</TouchableOpacity>
 			</BottomSheetView>
 		</BottomSheetModal>

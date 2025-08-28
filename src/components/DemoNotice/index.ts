@@ -1,1 +1,0 @@
-export { DemoNotice } from './DemoNotice';

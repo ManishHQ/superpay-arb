@@ -1,25 +1,26 @@
-import { useReactiveClient } from '@dynamic-labs/react-hooks';
-import { client } from '@/lib/client';
-import { LoginView } from '@/LoginView/LoginView';
-import { DisplayAuthenticatedUserView } from '@/DisplayAuthenticatedUserView';
-import { Text } from 'react-native';
+import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
-	const { auth, sdk } = useReactiveClient(client);
 	const router = useRouter();
+	const [isReady, setIsReady] = useState(false);
 
-	if (!sdk.loaded) {
-		return <Text>Loading...</Text>;
-	}
+	useEffect(() => {
+		// Wait for the component to be fully mounted before navigating
+		const timer = setTimeout(() => {
+			setIsReady(true);
+			router.push('/login');
+		}, 100);
 
-	if (!auth.token) {
-		return router.push('/login');
-	}
+		return () => clearTimeout(timer);
+	}, [router]);
 
-	if (auth.token) {
-		return <DisplayAuthenticatedUserView />;
-	}
-
-	return <LoginView />;
+	return (
+		<View className='items-center justify-center flex-1 bg-white'>
+			<Text className='text-lg text-gray-600'>
+				{isReady ? 'Redirecting...' : 'Loading...'}
+			</Text>
+		</View>
+	);
 }

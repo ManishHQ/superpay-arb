@@ -1,108 +1,184 @@
 import { useState } from 'react';
-import { InputField } from '@/InputField/InputField';
-import { client } from '@/lib/client';
-import { Button, StyleSheet, View } from 'react-native';
+import {
+	View,
+	Text,
+	TextInput,
+	TouchableOpacity,
+	StyleSheet,
+} from 'react-native';
 import { router } from 'expo-router';
-import { useReactiveClient } from '@dynamic-labs/react-hooks';
 
 export default function LoginPage() {
-	const [usedOneTimePasswordMethod, setUsedOneTimePasswordMethod] = useState<
-		'email' | 'sms' | null
-	>(null);
-	const { auth } = useReactiveClient(client);
+	const [email, setEmail] = useState('');
+	const [phone, setPhone] = useState('');
+	const [otp, setOtp] = useState('');
+	const [showOTPInput, setShowOTPInput] = useState(false);
 
-	if (auth.token) {
-		router.push('/home');
-	}
-
-	const renderContent = () => {
-		if (usedOneTimePasswordMethod !== null) {
-			const onSubmit = (token: string) => {
-				if (usedOneTimePasswordMethod === 'email') {
-					client.auth.email
-						.verifyOTP(token)
-						.then(() => {
-							router.push('/home');
-						})
-						.catch((error) => {
-							console.error(error);
-						});
-				} else if (usedOneTimePasswordMethod === 'sms') {
-					client.auth.sms
-						.verifyOTP(token)
-						.then(() => {
-							router.push('/home');
-						})
-						.catch((error) => {
-							console.error(error);
-						});
-				}
-			};
-
-			return (
-				<>
-					<InputField key='otp' placeholder='OTP token' onSubmit={onSubmit} />
-					<Button
-						title='Cancel'
-						onPress={() => setUsedOneTimePasswordMethod(null)}
-					/>
-				</>
-			);
-		}
-
-		return (
-			<>
-				<InputField
-					key='email'
-					placeholder='Email login'
-					onSubmit={(email) =>
-						client.auth.email
-							.sendOTP(email)
-							.then(() => setUsedOneTimePasswordMethod('email'))
-					}
-				/>
-				<InputField
-					key='sms'
-					placeholder='US/CA SMS login'
-					onSubmit={(phone) =>
-						client.auth.sms
-							.sendOTP({ dialCode: '1', iso2: 'us', phone })
-							.then(() => setUsedOneTimePasswordMethod('sms'))
-					}
-				/>
-				<Button
-					title='Connect with Farcaster'
-					onPress={() => client.auth.social.connect({ provider: 'farcaster' })}
-				/>
-				<Button
-					title='Connect with Google'
-					onPress={() => client.auth.social.connect({ provider: 'google' })}
-				/>
-				<Button
-					onPress={() => client.ui.auth.show()}
-					title='Open Auth Flow UI'
-				/>
-			</>
-		);
+	const handleEmailLogin = () => {
+		// Move authentication logic to services
+		console.log('Email login:', email);
+		setShowOTPInput(true);
 	};
 
-	return <View style={styles.container}>{renderContent()}</View>;
+	const handleSMSLogin = () => {
+		// Move authentication logic to services
+		console.log('SMS login:', phone);
+		setShowOTPInput(true);
+	};
+
+	const handleOTPVerification = () => {
+		// Move verification logic to services
+		console.log('OTP verification:', otp);
+		router.push('/(tabs)/home');
+	};
+
+	const handleSocialLogin = (provider: string) => {
+		// Move social auth logic to services
+		console.log('Social login:', provider);
+		router.push('/(tabs)/home');
+	};
+
+	return (
+		<View style={styles.container}>
+			<Text style={styles.title}>Welcome to SuperPay</Text>
+
+			{showOTPInput ? (
+				<View style={styles.section}>
+					<Text style={styles.label}>Enter OTP</Text>
+					<TextInput
+						style={styles.input}
+						placeholder='Enter OTP code'
+						value={otp}
+						onChangeText={setOtp}
+						keyboardType='numeric'
+					/>
+					<TouchableOpacity
+						style={styles.button}
+						onPress={handleOTPVerification}
+					>
+						<Text style={styles.buttonText}>Verify OTP</Text>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={styles.cancelButton}
+						onPress={() => setShowOTPInput(false)}
+					>
+						<Text style={styles.cancelButtonText}>Cancel</Text>
+					</TouchableOpacity>
+				</View>
+			) : (
+				<>
+					<View style={styles.section}>
+						<Text style={styles.label}>Email Login</Text>
+						<TextInput
+							style={styles.input}
+							placeholder='Enter your email'
+							value={email}
+							onChangeText={setEmail}
+							keyboardType='email-address'
+						/>
+						<TouchableOpacity style={styles.button} onPress={handleEmailLogin}>
+							<Text style={styles.buttonText}>Send Email OTP</Text>
+						</TouchableOpacity>
+					</View>
+
+					<View style={styles.section}>
+						<Text style={styles.label}>SMS Login</Text>
+						<TextInput
+							style={styles.input}
+							placeholder='Enter your phone number'
+							value={phone}
+							onChangeText={setPhone}
+							keyboardType='phone-pad'
+						/>
+						<TouchableOpacity style={styles.button} onPress={handleSMSLogin}>
+							<Text style={styles.buttonText}>Send SMS OTP</Text>
+						</TouchableOpacity>
+					</View>
+
+					<View style={styles.socialSection}>
+						<TouchableOpacity
+							style={styles.socialButton}
+							onPress={() => handleSocialLogin('farcaster')}
+						>
+							<Text style={styles.buttonText}>Connect with Farcaster</Text>
+						</TouchableOpacity>
+
+						<TouchableOpacity
+							style={styles.socialButton}
+							onPress={() => handleSocialLogin('google')}
+						>
+							<Text style={styles.buttonText}>Connect with Google</Text>
+						</TouchableOpacity>
+					</View>
+				</>
+			)}
+		</View>
+	);
 }
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		minHeight: '100%',
-		minWidth: '100%',
-		alignContent: 'stretch',
-		gap: 40,
 		padding: 20,
-		backgroundColor: 'rgba(255, 255, 255, 0.8)', // Add a semi-transparent white overlay
+		backgroundColor: '#f5f5f5',
+		justifyContent: 'center',
 	},
-	logo: {
-		width: 200,
-		height: 200,
-		alignSelf: 'center',
-		marginBottom: 20,
+	title: {
+		fontSize: 28,
+		fontWeight: 'bold',
+		textAlign: 'center',
+		marginBottom: 40,
+		color: '#333',
+	},
+	section: {
+		marginBottom: 30,
+	},
+	socialSection: {
+		marginTop: 20,
+		gap: 15,
+	},
+	label: {
+		fontSize: 16,
+		fontWeight: '600',
+		marginBottom: 10,
+		color: '#333',
+	},
+	input: {
+		borderWidth: 1,
+		borderColor: '#ddd',
+		borderRadius: 8,
+		padding: 15,
+		fontSize: 16,
+		backgroundColor: '#fff',
+		marginBottom: 15,
+	},
+	button: {
+		backgroundColor: '#4F46E5',
+		borderRadius: 8,
+		padding: 15,
+		alignItems: 'center',
+	},
+	socialButton: {
+		backgroundColor: '#6B7280',
+		borderRadius: 8,
+		padding: 15,
+		alignItems: 'center',
+	},
+	cancelButton: {
+		backgroundColor: '#EF4444',
+		borderRadius: 8,
+		padding: 15,
+		alignItems: 'center',
+		marginTop: 10,
+	},
+	buttonText: {
+		color: '#fff',
+		fontSize: 16,
+		fontWeight: '600',
+	},
+	cancelButtonText: {
+		color: '#fff',
+		fontSize: 16,
+		fontWeight: '600',
 	},
 });

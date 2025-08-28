@@ -10,16 +10,9 @@ import {
 } from 'react-native';
 import { BottomSheetModal, BottomSheetView } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { PaymentService } from '@/services/paymentService';
-import { TransactionService } from '@/services/transactionService';
-import { USDCService } from '@/services/usdcService';
-import { UserProfile } from '@/services/authService';
-import { useBalanceStore } from '@/stores/balanceStore';
-import { useUserStore } from '@/stores/userStore';
-import UserSearch from '@/components/UserSearch';
 
-// Mock contacts data (converted to UserProfile format)
-const contacts: UserProfile[] = [
+// Mock contacts data
+const mockContacts = [
 	{
 		id: '1',
 		firstName: 'Sarah',
@@ -44,26 +37,10 @@ const contacts: UserProfile[] = [
 		phone: '+1 (555) 345-6789',
 		username: 'emmad',
 	},
-	{
-		id: '4',
-		firstName: 'John',
-		lastName: 'Smith',
-		email: 'john.smith@example.com',
-		phone: '+1 (555) 456-7890',
-		username: 'johns',
-	},
-	{
-		id: '5',
-		firstName: 'Lisa',
-		lastName: 'Johnson',
-		email: 'lisa.johnson@example.com',
-		phone: '+1 (555) 567-8901',
-		username: 'lisaj',
-	},
 ];
 
 interface SendBottomSheetProps {
-	bottomSheetModalRef: React.RefObject<BottomSheetModal | null>;
+	bottomSheetModalRef: React.RefObject<BottomSheetModal>;
 	onSend: (amount: number, recipients: string[], note: string) => void;
 }
 
@@ -71,147 +48,88 @@ export default function SendBottomSheet({
 	bottomSheetModalRef,
 	onSend,
 }: SendBottomSheetProps) {
+	const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
 	const [amount, setAmount] = useState('');
-	const [selectedContacts, setSelectedContacts] = useState<UserProfile[]>([]);
 	const [note, setNote] = useState('');
-	const [selectedTags, setSelectedTags] = useState<string[]>(['personal']);
-	const [isLoading, setIsLoading] = useState(false);
-	const [showUserSearch, setShowUserSearch] = useState(false);
+	const [searchQuery, setSearchQuery] = useState('');
+	const [isSending, setIsSending] = useState(false);
 
-	// Get balance store and user store
-	const { usdcBalance, refreshAllBalances, walletAddress } = useBalanceStore();
-	const { user: currentUser } = useUserStore();
+	const snapPoints = useMemo(() => ['25%', '50%', '90%'], []);
 
-	// Variables
-	const snapPoints = useMemo(() => ['25%', '90%'], []);
+	// Filter contacts based on search
+	const filteredContacts = mockContacts.filter(
+		(contact) =>
+			`${contact.firstName} ${contact.lastName}`
+				.toLowerCase()
+				.includes(searchQuery.toLowerCase()) ||
+			contact.email.toLowerCase().includes(searchQuery.toLowerCase())
+	);
 
-	// Callbacks
 	const handleSheetChanges = useCallback((index: number) => {
 		console.log('handleSheetChanges', index);
 	}, []);
 
-	const handleSend = async () => {
-		if (!amount || selectedContacts.length === 0) return;
-
-		const amountFloat = parseFloat(amount);
-		const amountPerPerson = amountFloat / selectedContacts.length;
-
-		// Validate balance
-		if (amountFloat > parseFloat(usdcBalance)) {
-			Alert.alert('Error', 'Insufficient USDC balance');
-			return;
-		}
-
-		// Get current user's wallet address
-		let currentUserAddress = walletAddress || currentUser?.walletAddress;
-		if (!currentUserAddress) {
-			try {
-				const { MagicService } = await import('@/hooks/magic');
-				const magicUserInfo = await MagicService.magic.user.getInfo();
-				currentUserAddress = magicUserInfo.publicAddress;
-			} catch (error) {
-				Alert.alert('Error', 'Unable to get wallet address. Please try again.');
-				return;
-			}
-		}
-
-		setIsLoading(true);
-		try {
-			console.log(
-				'🚀 Processing payments to',
-				selectedContacts.length,
-				'recipients'
-			);
-
-			// Process each payment
-			for (const contact of selectedContacts) {
-				if (!contact.walletAddress) {
-					Alert.alert(
-						'Error',
-						`${
-							contact.firstName || contact.email
-						} does not have a wallet address set up.`
-					);
-					return;
-				}
-
-				// Execute USDC transfer
-				const result = await TransactionService.executeTransfer(
-					contact.walletAddress,
-					amountPerPerson.toString(),
-					currentUserAddress,
-					usdcBalance,
-					note.trim() ||
-						`Payment to ${
-							contact.firstName || contact.username || contact.email
-						}`,
-					selectedTags
-				);
-
-				if (!result.success) {
-					Alert.alert(
-						'Transfer Failed',
-						`Failed to send payment to ${contact.firstName || contact.email}: ${
-							result.error
-						}`
-					);
-					return;
-				}
-
-				console.log(
-					`✅ Payment to ${contact.firstName || contact.email}:`,
-					result.txHash
-				);
-			}
-
-			const recipientNames = selectedContacts.map((contact) =>
-				contact.firstName && contact.lastName
-					? `${contact.firstName} ${contact.lastName}`
-					: contact.username || contact.email
-			);
-
-			// Update balances
-			await refreshAllBalances();
-
-			// Call parent callback
-			onSend(amountFloat, recipientNames, note);
-
-			Alert.alert(
-				'Success',
-				`Successfully sent ${amountFloat} USDC to ${selectedContacts.length} recipient(s)!`
-			);
-
-			// Reset form
-			setAmount('');
-			setSelectedContacts([]);
-			setNote('');
-			bottomSheetModalRef.current?.dismiss();
-		} catch (error) {
-			console.error('Error sending payments:', error);
-			Alert.alert('Error', 'Failed to send payments. Please try again.');
-		} finally {
-			setIsLoading(false);
-		}
-	};
-
-	const addContact = (user: UserProfile) => {
-		const userId = user.id || user._id;
-		if (!selectedContacts.find((c) => (c.id || c._id) === userId)) {
-			setSelectedContacts([...selectedContacts, user]);
-		}
-		setShowUserSearch(false);
-	};
-
-	const removeContact = (contactId: string) => {
-		setSelectedContacts(
-			selectedContacts.filter((c) => (c.id || c._id) !== contactId)
+	const toggleContact = (contactId: string) => {
+		setSelectedContacts((prev) =>
+			prev.includes(contactId)
+				? prev.filter((id) => id !== contactId)
+				: [...prev, contactId]
 		);
 	};
 
-	const totalPerPerson =
-		selectedContacts.length > 0
-			? parseFloat(amount || '0') / selectedContacts.length
-			: 0;
+	const handleSend = async () => {
+		if (selectedContacts.length === 0) {
+			Alert.alert('Error', 'Please select at least one recipient');
+			return;
+		}
+
+		if (!amount || parseFloat(amount) <= 0) {
+			Alert.alert('Error', 'Please enter a valid amount');
+			return;
+		}
+
+		setIsSending(true);
+		try {
+			// Move send logic to services
+			const selectedNames = selectedContacts.map((id) => {
+				const contact = mockContacts.find((c) => c.id === id);
+				return contact ? `${contact.firstName} ${contact.lastName}` : 'Unknown';
+			});
+
+			console.log('Sending payment:', {
+				amount: parseFloat(amount),
+				recipients: selectedNames,
+				note,
+			});
+
+			// Simulate API call
+			await new Promise((resolve) => setTimeout(resolve, 2000));
+
+			onSend(parseFloat(amount), selectedNames, note);
+
+			// Reset form
+			setSelectedContacts([]);
+			setAmount('');
+			setNote('');
+			setSearchQuery('');
+
+			bottomSheetModalRef.current?.dismiss();
+		} catch (error) {
+			console.error('Send error:', error);
+			Alert.alert('Error', 'Failed to send payment. Please try again.');
+		} finally {
+			setIsSending(false);
+		}
+	};
+
+	const getSelectedContactNames = () => {
+		return selectedContacts
+			.map((id) => {
+				const contact = mockContacts.find((c) => c.id === id);
+				return contact ? contact.firstName : 'Unknown';
+			})
+			.join(', ');
+	};
 
 	return (
 		<BottomSheetModal
@@ -219,13 +137,11 @@ export default function SendBottomSheet({
 			index={1}
 			snapPoints={snapPoints}
 			onChange={handleSheetChanges}
-			backgroundStyle={{ backgroundColor: 'white' }}
-			handleIndicatorStyle={{ backgroundColor: '#E0E0E0' }}
 		>
-			<BottomSheetView className='flex-1 px-6' style={{ paddingBottom: 32 }}>
+			<BottomSheetView className='flex-1 px-6 py-4'>
 				{/* Header */}
-				<View className='flex-row items-center justify-between mb-8'>
-					<Text className='text-2xl font-bold text-text-main'>Send Money</Text>
+				<View className='flex-row items-center justify-between mb-6'>
+					<Text className='text-2xl font-bold text-gray-900'>Send Money</Text>
 					<TouchableOpacity
 						onPress={() => bottomSheetModalRef.current?.dismiss()}
 						className='p-2'
@@ -235,240 +151,127 @@ export default function SendBottomSheet({
 				</View>
 
 				{/* Amount Input */}
-				<View className='mb-8'>
-					<Text className='mb-3 text-base font-semibold text-gray-700'>
+				<View className='mb-6'>
+					<Text className='mb-3 text-lg font-semibold text-gray-900'>
 						Amount
 					</Text>
-					<View className='flex-row items-center px-4 py-4 bg-white border border-gray-300 rounded-2xl'>
-						<Text className='mr-3 text-3xl font-bold text-text-main'>$</Text>
+					<View className='flex-row items-center p-4 border border-gray-300 rounded-xl'>
+						<Text className='mr-3 text-xl font-bold text-blue-600'>$</Text>
 						<TextInput
+							placeholder='0.00'
 							value={amount}
 							onChangeText={setAmount}
-							placeholder='0.00'
 							keyboardType='decimal-pad'
-							className='flex-1 text-3xl font-bold text-text-main'
-							placeholderTextColor='#999'
-							style={{ fontSize: 24, paddingBottom: 6 }}
+							className='flex-1 text-xl font-semibold'
+							placeholderTextColor='#9CA3AF'
+						/>
+						<Text className='ml-3 text-sm font-medium text-gray-500'>USD</Text>
+					</View>
+				</View>
+
+				{/* Contact Search */}
+				<View className='mb-4'>
+					<Text className='mb-3 text-lg font-semibold text-gray-900'>
+						Send To ({selectedContacts.length} selected)
+					</Text>
+					<View className='flex-row items-center p-3 border border-gray-300 rounded-xl'>
+						<Ionicons name='search' size={20} color='#9CA3AF' />
+						<TextInput
+							placeholder='Search contacts...'
+							value={searchQuery}
+							onChangeText={setSearchQuery}
+							className='flex-1 ml-3 text-base'
+							placeholderTextColor='#9CA3AF'
 						/>
 					</View>
 				</View>
 
-				{/* Contact Selection */}
-				<View className='mb-8'>
-					<Text className='mb-3 text-base font-semibold text-gray-700'>To</Text>
-
-					{/* Selected Contacts */}
-					<View className='border border-gray-300 rounded-2xl p-4 bg-white min-h-[70px]'>
-						{/* Selected Contacts Pills */}
-						{selectedContacts.length > 0 && (
-							<View className='mb-4'>
-								<View className='flex-row flex-wrap gap-2'>
-									{selectedContacts.map((contact) => {
-										const contactId = contact.id || contact._id;
-										const contactName =
-											contact.firstName && contact.lastName
-												? `${contact.firstName} ${contact.lastName}`
-												: contact.username || contact.email;
-										return (
-											<View
-												key={contactId}
-												className='flex-row items-center px-3 py-2 rounded-full bg-primary-blue'
-											>
-												<View className='items-center justify-center w-5 h-5 mr-2 bg-white rounded-full'>
-													<Text className='text-blue-600 font-semibold text-xs'>
-														{contactName.charAt(0).toUpperCase()}
-													</Text>
-												</View>
-												<Text className='mr-2 text-sm font-medium text-white'>
-													{contactName}
-												</Text>
-												<TouchableOpacity
-													onPress={() => removeContact(contactId)}
-												>
-													<Ionicons
-														name='close-circle'
-														size={16}
-														color='white'
-													/>
-												</TouchableOpacity>
-											</View>
-										);
-									})}
-								</View>
-							</View>
-						)}
-
-						{/* Add Contact Button */}
-						<TouchableOpacity
-							className='flex-row items-center'
-							onPress={() => setShowUserSearch(true)}
-						>
-							<Ionicons name='search' size={18} color='#666' />
-							<Text className='flex-1 ml-2 text-base text-gray-500'>
-								{selectedContacts.length === 0
-									? 'Search by name or username...'
-									: 'Add more contacts...'}
-							</Text>
-							<Ionicons name='add-circle' size={20} color='#3D5AFE' />
-						</TouchableOpacity>
-					</View>
-
-					{/* Per Person Amount */}
-					{selectedContacts.length > 1 && amount && (
-						<Text className='mt-3 ml-1 text-sm text-gray-500'>
-							${totalPerPerson.toFixed(2)} per person
+				{/* Selected Contacts Preview */}
+				{selectedContacts.length > 0 && (
+					<View className='p-3 mb-4 rounded-xl bg-blue-50'>
+						<Text className='text-sm text-blue-600'>Sending to:</Text>
+						<Text className='font-medium text-blue-900'>
+							{getSelectedContactNames()}
 						</Text>
-					)}
+					</View>
+				)}
 
-					{/* Quick Add Suggestions */}
-					{selectedContacts.length === 0 && (
-						<View className='mt-4'>
-							<Text className='mb-4 ml-1 text-sm text-gray-600'>
-								Quick add:
-							</Text>
-							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-								<View className='flex-row space-x-4'>
-									{contacts.slice(0, 4).map((contact) => (
-										<TouchableOpacity
-											key={contact.id}
-											className='items-center'
-											onPress={() => addContact(contact)}
-										>
-											<View
-												className='items-center justify-center bg-blue-100 rounded-full'
-												style={{
-													width: 48,
-													height: 48,
-													marginBottom: 8,
-												}}
-											>
-												<Text className='text-blue-600 font-semibold text-lg'>
-													{(contact.firstName || contact.username || '?')
-														.charAt(0)
-														.toUpperCase()}
-												</Text>
-											</View>
-											<Text
-												className='text-xs text-center text-gray-600'
-												numberOfLines={1}
-											>
-												{contact.firstName || contact.username || 'User'}
-											</Text>
-										</TouchableOpacity>
-									))}
-								</View>
-							</ScrollView>
-						</View>
-					)}
-				</View>
+				{/* Contacts List */}
+				<ScrollView
+					className='flex-1 mb-4'
+					showsVerticalScrollIndicator={false}
+				>
+					{filteredContacts.map((contact) => (
+						<TouchableOpacity
+							key={contact.id}
+							onPress={() => toggleContact(contact.id)}
+							className={`flex-row items-center p-4 mb-2 border rounded-xl ${
+								selectedContacts.includes(contact.id)
+									? 'border-blue-500 bg-blue-50'
+									: 'border-gray-200 bg-white'
+							}`}
+						>
+							<View className='items-center justify-center w-12 h-12 mr-4 bg-gray-200 rounded-full'>
+								<Text className='text-lg font-bold text-gray-600'>
+									{contact.firstName[0]}
+								</Text>
+							</View>
+							<View className='flex-1'>
+								<Text className='text-base font-semibold text-gray-900'>
+									{contact.firstName} {contact.lastName}
+								</Text>
+								<Text className='text-sm text-gray-500'>{contact.email}</Text>
+							</View>
+							{selectedContacts.includes(contact.id) && (
+								<Ionicons name='checkmark-circle' size={24} color='#3B82F6' />
+							)}
+						</TouchableOpacity>
+					))}
+				</ScrollView>
 
 				{/* Note Input */}
 				<View className='mb-6'>
-					<Text className='mb-3 text-base font-semibold text-gray-700'>
+					<Text className='mb-3 text-lg font-semibold text-gray-900'>
 						Note (Optional)
 					</Text>
 					<TextInput
+						placeholder="What's this for?"
 						value={note}
 						onChangeText={setNote}
-						placeholder="What's this for?"
-						className='px-4 py-4 text-base bg-white border border-gray-300 rounded-2xl text-text-main'
-						placeholderTextColor='#999'
 						multiline
-						style={{ fontSize: 16, minHeight: 60 }}
+						numberOfLines={2}
+						className='p-4 text-base border border-gray-300 rounded-xl'
+						placeholderTextColor='#9CA3AF'
+						textAlignVertical='top'
 					/>
-				</View>
-
-				{/* Tag Selection */}
-				<View className='mb-8'>
-					<Text className='mb-3 text-base font-semibold text-gray-700'>
-						Tags
-					</Text>
-					<ScrollView
-						horizontal
-						showsHorizontalScrollIndicator={false}
-						className='flex-row'
-					>
-						{[
-							'personal',
-							'food',
-							'entertainment',
-							'transportation',
-							'shopping',
-							'rent',
-							'savings',
-						].map((tag) => (
-							<TouchableOpacity
-								key={tag}
-								onPress={() => {
-									if (selectedTags.includes(tag)) {
-										setSelectedTags(selectedTags.filter((t) => t !== tag));
-									} else {
-										setSelectedTags([...selectedTags, tag]);
-									}
-								}}
-								className={`mr-3 px-4 py-2 rounded-full border ${
-									selectedTags.includes(tag)
-										? 'bg-blue-500 border-blue-500'
-										: 'bg-white border-gray-300'
-								}`}
-							>
-								<Text
-									className={`text-sm font-medium ${
-										selectedTags.includes(tag) ? 'text-white' : 'text-gray-700'
-									}`}
-								>
-									{tag.charAt(0).toUpperCase() + tag.slice(1)}
-								</Text>
-							</TouchableOpacity>
-						))}
-					</ScrollView>
 				</View>
 
 				{/* Send Button */}
 				<TouchableOpacity
-					className={`py-5 rounded-2xl items-center ${
-						amount && selectedContacts.length > 0 && !isLoading
-							? 'bg-primary-blue'
+					onPress={handleSend}
+					disabled={selectedContacts.length === 0 || !amount || isSending}
+					className={`p-4 rounded-xl ${
+						selectedContacts.length > 0 && amount && !isSending
+							? 'bg-green-600'
 							: 'bg-gray-300'
 					}`}
-					style={{ paddingHorizontal: 16 }}
-					onPress={handleSend}
-					disabled={!amount || selectedContacts.length === 0 || isLoading}
 				>
-					{isLoading ? (
-						<View className='flex-row items-center'>
+					{isSending ? (
+						<View className='flex-row items-center justify-center'>
 							<ActivityIndicator size='small' color='white' />
 							<Text className='ml-2 text-lg font-semibold text-white'>
 								Sending...
 							</Text>
 						</View>
 					) : (
-						<Text
-							className={`text-lg font-semibold ${
-								amount && selectedContacts.length > 0
-									? 'text-white'
-									: 'text-gray-500'
-							}`}
-						>
-							Send ${amount || '0.00'}
-							{selectedContacts.length > 1 &&
-								` to ${selectedContacts.length} people`}
-						</Text>
+						<View className='flex-row items-center justify-center'>
+							<Ionicons name='send' size={20} color='white' />
+							<Text className='ml-2 text-lg font-semibold text-white'>
+								Send {amount ? `$${amount}` : 'Money'}
+							</Text>
+						</View>
 					)}
 				</TouchableOpacity>
-
-				{/* User Search Modal */}
-				<UserSearch
-					visible={showUserSearch}
-					onClose={() => setShowUserSearch(false)}
-					onUserSelect={addContact}
-					title='Add Contact'
-					placeholder='Search by name or username...'
-					multiSelect={true}
-					selectedUsers={selectedContacts}
-					excludeCurrentUser={true}
-					minSearchLength={3}
-				/>
 			</BottomSheetView>
 		</BottomSheetModal>
 	);

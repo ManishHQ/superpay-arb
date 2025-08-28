@@ -11,56 +11,55 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, useEffect } from 'react';
-import {
-	ActivityService,
-	type Activity,
-	ActivityType,
-} from '@/services/activityService';
-import CreateActivityModal from '@/components/CreateActivityModal';
-import UserSearch from '@/components/UserSearch';
-import { useUserStore } from '@/stores/userStore';
+
+// Mock data for display
+const mockActivities = [
+	{
+		id: '1',
+		name: 'Dinner with Friends',
+		description: 'Split dinner bill at Italian restaurant',
+		type: 'dining',
+		members: ['Sarah', 'Mike', 'Emma'],
+		createdAt: '2024-01-15T10:00:00Z',
+		icon: '🍝',
+	},
+	{
+		id: '2',
+		name: 'Movie Night',
+		description: 'Shared movie tickets and snacks',
+		type: 'entertainment',
+		members: ['John', 'Lisa'],
+		createdAt: '2024-01-14T18:30:00Z',
+		icon: '🎬',
+	},
+	{
+		id: '3',
+		name: 'Road Trip',
+		description: 'Gas and hotel expenses for weekend trip',
+		type: 'travel',
+		members: ['Alex', 'Jordan', 'Taylor', 'Casey'],
+		createdAt: '2024-01-12T08:15:00Z',
+		icon: '🚗',
+	},
+];
+
+const activityTypeOptions = [
+	{ label: '🍽️ Dining', value: 'dining' },
+	{ label: '🎬 Entertainment', value: 'entertainment' },
+	{ label: '🚗 Travel', value: 'travel' },
+	{ label: '🏠 Housing', value: 'housing' },
+	{ label: '🛒 Shopping', value: 'shopping' },
+];
 
 export default function ActivityScreen() {
-	const [activities, setActivities] = useState<Activity[]>([]);
-	const [filteredActivities, setFilteredActivities] = useState<Activity[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
+	const [activities, setActivities] = useState(mockActivities);
+	const [filteredActivities, setFilteredActivities] = useState(mockActivities);
+	const [isLoading, setIsLoading] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
-	const [selectedType, setSelectedType] = useState<ActivityType | null>(null);
+	const [selectedType, setSelectedType] = useState<string | null>(null);
 	const [showCreateModal, setShowCreateModal] = useState(false);
 	const [showUserSearch, setShowUserSearch] = useState(false);
-	const { user } = useUserStore();
-	// Fetch activities from API
-	const fetchActivities = async () => {
-		try {
-			setError(null);
-			const response = await ActivityService.getActivities(1, 100);
-			console.log('response', response.data.activities);
-			setActivities(response.data.activities);
-			setFilteredActivities(response.data.activities);
-		} catch (error) {
-			console.error('Error fetching activities:', error);
-			setError('Failed to load activities');
-		} finally {
-			setIsLoading(false);
-		}
-	};
-
-	// Fetch activity statistics
-	const fetchStats = async () => {
-		try {
-			await ActivityService.getActivityStats();
-		} catch (error) {
-			console.error('Error fetching stats:', error);
-		}
-	};
-
-	// Load data on component mount
-	useEffect(() => {
-		fetchActivities();
-		fetchStats();
-	}, []);
 
 	// Filter activities based on search query and type
 	useEffect(() => {
@@ -88,55 +87,40 @@ export default function ActivityScreen() {
 	// Handle pull-to-refresh
 	const onRefresh = async () => {
 		setRefreshing(true);
-		try {
-			await Promise.all([fetchActivities(), fetchStats()]);
-		} catch (error) {
-			console.error('Error refreshing:', error);
-		} finally {
-			setRefreshing(false);
-		}
+		// Move refresh logic to services
+		console.log('Refreshing activities...');
+		setTimeout(() => setRefreshing(false), 1000);
 	};
 
 	// Handle activity creation
-	const handleActivityCreated = () => {
-		fetchActivities();
-		fetchStats();
+	const handleCreateActivity = () => {
+		console.log('Create activity - move logic to services');
+		setShowCreateModal(true);
 	};
 
 	// Handle activity deletion
-	const handleDeleteActivity = async (
-		activityId: string,
-		activityName: string
-	) => {
+	const handleDeleteActivity = (activityId: string, activityName: string) => {
 		Alert.alert(
 			'Delete Activity',
 			`Are you sure you want to delete "${activityName}"?`,
 			[
-				{
-					text: 'Cancel',
-					style: 'cancel',
-				},
+				{ text: 'Cancel', style: 'cancel' },
 				{
 					text: 'Delete',
 					style: 'destructive',
-					onPress: async () => {
-						try {
-							await ActivityService.deleteActivity(activityId);
-							Alert.alert('Success', 'Activity deleted successfully!');
-							fetchActivities();
-							fetchStats();
-						} catch (error) {
-							console.error('Error deleting activity:', error);
-							Alert.alert('Error', 'Failed to delete activity');
-						}
+					onPress: () => {
+						// Move delete logic to services
+						console.log('Deleting activity:', activityId);
+						setActivities((prev) => prev.filter((a) => a.id !== activityId));
+						setFilteredActivities((prev) =>
+							prev.filter((a) => a.id !== activityId)
+						);
+						Alert.alert('Success', 'Activity deleted successfully!');
 					},
 				},
 			]
 		);
 	};
-
-	// Get activity type options for filter
-	const activityTypeOptions = ActivityService.getActivityTypeOptions();
 
 	// Format date
 	const formatDate = (dateString: string) => {
@@ -152,12 +136,11 @@ export default function ActivityScreen() {
 	};
 
 	// Render activity item
-	const renderActivityItem = (activity: Activity) => (
+	const renderActivityItem = (activity: (typeof mockActivities)[0]) => (
 		<TouchableOpacity
-			key={activity._id}
+			key={activity.id}
 			className='flex-row items-start p-4 mb-3 bg-white border shadow-sm rounded-xl border-gray-50'
 			onPress={() => {
-				// For now, just show an alert. In the future, this could navigate to a detail screen
 				Alert.alert(
 					'Activity Details',
 					`Viewing details for: ${activity.name}`
@@ -166,14 +149,8 @@ export default function ActivityScreen() {
 		>
 			<View className='relative mr-3'>
 				<View className='items-center justify-center rounded-full w-14 h-14 bg-blue-50'>
-					<Text className='text-2xl'>
-						{activity.icon ||
-							ActivityService.getActivityTypeIcon(activity.type)}
-					</Text>
+					<Text className='text-2xl'>{activity.icon}</Text>
 				</View>
-				{!activity.isActive && (
-					<View className='absolute w-4 h-4 bg-gray-400 border-2 border-white rounded-full -top-1 -right-1' />
-				)}
 			</View>
 			<View className='flex-1'>
 				<View className='flex-row items-center justify-between mb-1'>
@@ -211,7 +188,7 @@ export default function ActivityScreen() {
 					</View>
 
 					<TouchableOpacity
-						onPress={() => handleDeleteActivity(activity._id, activity.name)}
+						onPress={() => handleDeleteActivity(activity.id, activity.name)}
 						className='p-2 ml-2'
 					>
 						<Ionicons name='trash-outline' size={16} color='#EF4444' />
@@ -235,32 +212,6 @@ export default function ActivityScreen() {
 		);
 	}
 
-	// Show error state
-	if (error && activities.length === 0) {
-		return (
-			<SafeAreaView className='flex-1 bg-gray-50'>
-				<View className='items-center justify-center flex-1 px-6'>
-					<Ionicons name='alert-circle' size={64} color='#EF4444' />
-					<Text className='mt-4 text-xl font-semibold text-center text-gray-900'>
-						Failed to Load Activities
-					</Text>
-					<Text className='mt-2 text-base text-center text-gray-600'>
-						{error}
-					</Text>
-					<TouchableOpacity
-						className='px-6 py-3 mt-6 bg-blue-600 rounded-lg'
-						onPress={() => {
-							setError(null);
-							fetchActivities();
-						}}
-					>
-						<Text className='font-semibold text-white'>Try Again</Text>
-					</TouchableOpacity>
-				</View>
-			</SafeAreaView>
-		);
-	}
-
 	return (
 		<SafeAreaView className='flex-1 bg-gray-50' edges={['top']}>
 			{/* Header */}
@@ -273,18 +224,11 @@ export default function ActivityScreen() {
 						</Text>
 					</View>
 					<View className='flex-row items-center space-x-3'>
-						<TouchableOpacity
-							className='flex-row items-center px-3 py-2 bg-gray-100 rounded-xl'
-							onPress={() => setShowUserSearch(true)}
-						>
-							<Ionicons name='people' size={18} color='#4B5563' />
-							<Text className='ml-2 text-sm font-medium text-gray-700'>
-								Find
-							</Text>
-						</TouchableOpacity>
+						{/* find user */}
+
 						<TouchableOpacity
 							className='flex-row items-center px-4 py-2.5 rounded-xl bg-blue-600 shadow-sm'
-							onPress={() => setShowCreateModal(true)}
+							onPress={handleCreateActivity}
 						>
 							<Ionicons name='add' size={18} color='white' />
 							<Text className='ml-2 text-sm font-semibold text-white'>
@@ -304,11 +248,6 @@ export default function ActivityScreen() {
 							onChangeText={setSearchQuery}
 							className='flex-1 ml-3 text-base text-gray-900'
 							placeholderTextColor='#9CA3AF'
-							style={{
-								paddingVertical: 2,
-								textAlignVertical: 'center',
-								fontSize: 16,
-							}}
 						/>
 						{searchQuery.length > 0 && (
 							<TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -347,7 +286,7 @@ export default function ActivityScreen() {
 									selectedType === option.value ? 'text-white' : 'text-gray-600'
 								}`}
 							>
-								{option.icon} {option.label}
+								{option.label}
 							</Text>
 						</TouchableOpacity>
 					))}
@@ -389,7 +328,7 @@ export default function ActivityScreen() {
 						{!searchQuery && !selectedType && (
 							<TouchableOpacity
 								className='px-6 py-3 mt-4 bg-blue-600 rounded-lg'
-								onPress={() => setShowCreateModal(true)}
+								onPress={handleCreateActivity}
 							>
 								<Text className='font-semibold text-white'>
 									Create Activity
@@ -401,28 +340,6 @@ export default function ActivityScreen() {
 					filteredActivities.map(renderActivityItem)
 				)}
 			</ScrollView>
-
-			{/* Create Activity Modal */}
-			<CreateActivityModal
-				visible={showCreateModal}
-				onClose={() => setShowCreateModal(false)}
-				onActivityCreated={handleActivityCreated}
-			/>
-
-			{/* User Search Modal */}
-			<UserSearch
-				visible={showUserSearch}
-				onClose={() => setShowUserSearch(false)}
-				onUserSelect={(user) => {
-					console.log('User selected:', user);
-					// Handle user selection here
-					setShowUserSearch(false);
-				}}
-				title='Find Users'
-				placeholder='Search by name or username...'
-				excludeCurrentUser={user?._id ? false : true}
-				minSearchLength={3}
-			/>
 		</SafeAreaView>
 	);
 }
