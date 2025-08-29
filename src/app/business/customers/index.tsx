@@ -132,14 +132,19 @@ export default function BusinessCustomers() {
 		title: string,
 		value: string | number,
 		icon: string,
-		color: string
+		backgroundColor: string,
+		iconColor: string
 	) => (
-		<View style={[styles.statCard, { borderLeftColor: color }]}>
+		<View style={styles.statCard}>
 			<View style={styles.statHeader}>
-				<Ionicons name={icon as any} size={24} color={color} />
-				<Text style={styles.statTitle}>{title}</Text>
+				<View>
+					<Text style={styles.statValue}>{value}</Text>
+					<Text style={styles.statLabel}>{title}</Text>
+				</View>
+				<View style={[styles.iconContainer, { backgroundColor }]}>
+					<Ionicons name={icon as any} size={24} color={iconColor} />
+				</View>
 			</View>
-			<Text style={styles.statValue}>{value}</Text>
 		</View>
 	);
 
@@ -208,33 +213,61 @@ export default function BusinessCustomers() {
 				</View>
 
 				{/* Stats Cards */}
-				{customerStats && (
-					<View style={styles.statsContainer}>
+				{customerStats ? (
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						style={styles.statsContainer}
+					>
 						{renderStatsCard(
 							'Total Customers',
 							customerStats.total_customers,
 							'people',
-							'#3b82f6'
+							'#f3e8ff',
+							'#7c3aed'
 						)}
 						{renderStatsCard(
 							'Active Customers',
 							customerStats.active_customers,
 							'pulse',
-							'#10b981'
+							'#dcfce7',
+							'#16a34a'
 						)}
 						{renderStatsCard(
 							'Total Revenue',
 							formatCurrency(customerStats.total_revenue),
 							'trending-up',
-							'#f59e0b'
+							'#fed7aa',
+							'#ea580c'
 						)}
 						{renderStatsCard(
 							'Avg Transaction',
 							formatCurrency(customerStats.average_transaction_amount),
 							'calculator',
-							'#8b5cf6'
+							'#dbeafe',
+							'#2563eb'
 						)}
-					</View>
+					</ScrollView>
+				) : (
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						style={styles.statsContainer}
+					>
+						<View style={[styles.statCard, { opacity: 0.5 }]}>
+							<View style={styles.statHeader}>
+								<View>
+									<Text style={styles.statValue}>--</Text>
+									<Text style={styles.statLabel}>Loading...</Text>
+								</View>
+								<View
+									style={[styles.iconContainer, { backgroundColor: '#f3f4f6' }]}
+								>
+									<Ionicons name='ellipse' size={24} color='#9ca3af' />
+								</View>
+							</View>
+						</View>
+					</ScrollView>
 				)}
 
 				{/* Search and Sort */}
@@ -321,10 +354,7 @@ export default function BusinessCustomers() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#f9fafb',
-	},
-	scrollView: {
-		flex: 1,
+		backgroundColor: '#f5f5f5',
 	},
 	loadingContainer: {
 		flex: 1,
@@ -337,13 +367,18 @@ const styles = StyleSheet.create({
 		color: '#6b7280',
 	},
 	header: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginBottom: 24,
 		paddingHorizontal: 24,
-		paddingTop: 16,
-		paddingBottom: 24,
+		paddingVertical: 20,
+		borderBottomWidth: 1,
+		borderBottomColor: '#f3f4f6',
 	},
 	title: {
-		fontSize: 32,
-		fontWeight: '800',
+		fontSize: 24,
+		fontWeight: '700',
 		color: '#111827',
 		marginBottom: 4,
 	},
@@ -352,15 +387,20 @@ const styles = StyleSheet.create({
 		color: '#6b7280',
 	},
 	statsContainer: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		marginBottom: 32,
 		paddingHorizontal: 24,
-		marginBottom: 24,
 	},
 	statCard: {
 		backgroundColor: '#ffffff',
 		borderRadius: 16,
-		padding: 20,
-		marginBottom: 12,
-		borderLeftWidth: 4,
+		padding: 24,
+		marginBottom: 16,
+		marginRight: 16,
+		width: 280,
+		borderWidth: 1,
+		borderColor: '#f3f4f6',
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.05,
@@ -369,19 +409,26 @@ const styles = StyleSheet.create({
 	},
 	statHeader: {
 		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 8,
-	},
-	statTitle: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#6b7280',
-		marginLeft: 8,
+		justifyContent: 'space-between',
+		alignItems: 'flex-start',
 	},
 	statValue: {
-		fontSize: 24,
+		fontSize: 32,
 		fontWeight: '800',
 		color: '#111827',
+		marginBottom: 4,
+	},
+	statLabel: {
+		fontSize: 14,
+		color: '#6b7280',
+		fontWeight: '500',
+	},
+	iconContainer: {
+		width: 48,
+		height: 48,
+		borderRadius: 12,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	controlsContainer: {
 		paddingHorizontal: 24,

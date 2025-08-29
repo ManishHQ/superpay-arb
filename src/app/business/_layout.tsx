@@ -8,12 +8,15 @@ import {
 	Text,
 	useWindowDimensions,
 	TouchableOpacity,
+	Image,
 } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
 import { Ionicons } from '@expo/vector-icons';
 import { useReactiveClient } from '@dynamic-labs/react-hooks';
 import { dynamicClient } from '@/lib/client';
+import { useUserProfileStore } from '@/stores/userProfileStore';
+import { AvatarService } from '@/services/avatarService';
 
 const styles = StyleSheet.create({
 	container: {
@@ -69,6 +72,35 @@ const styles = StyleSheet.create({
 		color: '#111827',
 		fontWeight: '600',
 	},
+	sidebarProfileSection: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+		paddingVertical: 16,
+		marginBottom: 24,
+		borderBottomWidth: 1,
+		borderBottomColor: '#f3f4f6',
+	},
+	sidebarAvatar: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		marginRight: 12,
+		backgroundColor: '#e5e7eb',
+	},
+	sidebarProfileInfo: {
+		flex: 1,
+	},
+	sidebarDisplayName: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#111827',
+		marginBottom: 2,
+	},
+	sidebarBusinessType: {
+		fontSize: 14,
+		color: '#6b7280',
+	},
 });
 
 export default function BusinessLayout() {
@@ -79,6 +111,7 @@ export default function BusinessLayout() {
 	const isDesktop = width >= 768;
 	const router = useRouter();
 	const segments = useSegments();
+	const { currentProfile } = useUserProfileStore();
 
 	// Check authentication status
 	useEffect(() => {
@@ -116,6 +149,17 @@ export default function BusinessLayout() {
 
 	const currentRoute = segments[segments.length - 1];
 
+	// Get profile display information
+	const displayName =
+		currentProfile?.business_name ||
+		currentProfile?.display_name ||
+		currentProfile?.full_name ||
+		'Business Owner';
+	const avatarUrl = AvatarService.getAvatarUrl({
+		avatar_url: currentProfile?.avatar_url,
+		username: currentProfile?.username || 'business',
+	});
+
 	const navigationItems = [
 		{
 			name: 'home/index',
@@ -134,12 +178,6 @@ export default function BusinessLayout() {
 			title: 'Payments',
 			icon: 'card',
 			iconOutline: 'card-outline',
-		},
-		{
-			name: 'offers/index',
-			title: 'Offers',
-			icon: 'gift',
-			iconOutline: 'gift-outline',
 		},
 		{
 			name: 'loyalty/index',
@@ -165,8 +203,17 @@ export default function BusinessLayout() {
 		return (
 			<View style={styles.container}>
 				<View style={styles.sidebar}>
-					<View className='flex-row items-center justify-between'>
-						<Text style={styles.sidebarHeader}>Business Dashboard</Text>
+					{/* Profile Section */}
+					<View style={styles.sidebarProfileSection}>
+						<Image
+							source={{ uri: avatarUrl }}
+							style={styles.sidebarAvatar}
+							resizeMode='cover'
+						/>
+						<View style={styles.sidebarProfileInfo}>
+							<Text style={styles.sidebarDisplayName}>{displayName}</Text>
+							<Text style={styles.sidebarBusinessType}>Business Dashboard</Text>
+						</View>
 					</View>
 					{navigationItems.map((item) => {
 						const isActive =
@@ -234,9 +281,9 @@ export default function BusinessLayout() {
 							}}
 						/>
 						<Tabs.Screen
-							name='requests/index'
+							name='payments/index'
 							options={{
-								title: 'Payment Requests',
+								title: 'Payments',
 								tabBarIcon: ({ color, focused }) => (
 									<Ionicons
 										size={20}
@@ -267,6 +314,19 @@ export default function BusinessLayout() {
 									<Ionicons
 										size={20}
 										name={focused ? 'settings' : 'settings-outline'}
+										color={color}
+									/>
+								),
+							}}
+						/>
+						<Tabs.Screen
+							name='loyalty/index'
+							options={{
+								title: 'Loyalty',
+								tabBarIcon: ({ color, focused }) => (
+									<Ionicons
+										size={20}
+										name={focused ? 'medal' : 'medal-outline'}
 										color={color}
 									/>
 								),
@@ -321,9 +381,9 @@ export default function BusinessLayout() {
 					}}
 				/>
 				<Tabs.Screen
-					name='requests/index'
+					name='payments/index'
 					options={{
-						title: 'Requests',
+						title: 'Payments',
 						tabBarIcon: ({ color, focused }) => (
 							<Ionicons
 								size={24}
@@ -354,6 +414,19 @@ export default function BusinessLayout() {
 							<Ionicons
 								size={24}
 								name={focused ? 'settings' : 'settings-outline'}
+								color={color}
+							/>
+						),
+					}}
+				/>
+				<Tabs.Screen
+					name='loyalty/index'
+					options={{
+						title: 'Loyalty',
+						tabBarIcon: ({ color, focused }) => (
+							<Ionicons
+								size={24}
+								name={focused ? 'medal' : 'medal-outline'}
 								color={color}
 							/>
 						),
