@@ -10,7 +10,9 @@ import {
 	ActivityIndicator,
 	KeyboardAvoidingView,
 	Platform,
+	AppState,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import QRCode from 'react-native-qrcode-svg';
@@ -30,11 +32,71 @@ export default function PaymentScreen() {
 	const [qrData, setQrData] = useState<string>('');
 	const [showRequestModal, setShowRequestModal] = useState(false);
 	const [isScanning, setIsScanning] = useState(true);
+	const [isMounted, setIsMounted] = useState(true);
+	const [cameraKey, setCameraKey] = useState(0);
+	const [isCameraActive, setIsCameraActive] = useState(false);
+	const [isScreenFocused, setIsScreenFocused] = useState(true);
 
 	const { currentProfile } = useUserProfileStore();
 
+	// Cleanup on unmount
+	useEffect(() => {
+		return () => {
+			setIsMounted(false);
+			setIsCameraActive(false);
+		};
+	}, []);
+
+	// Handle screen focus - kill camera when screen loses focus
+	useFocusEffect(
+		React.useCallback(() => {
+			console.log('🎯 Payment screen focused');
+			setIsScreenFocused(true);
+
+			// Reset camera when screen is focused
+			if (mode === 'scan') {
+				resetCameraInstance();
+			}
+
+			return () => {
+				console.log('🎯 Payment screen unfocused - killing camera');
+				setIsScreenFocused(false);
+				setIsCameraActive(false);
+				setIsScanning(false);
+			};
+		}, [mode])
+	);
+
+	// Handle app state changes - pause camera when app goes to background
+	useEffect(() => {
+		const handleAppStateChange = (nextAppState: string) => {
+			console.log('📱 App state changed:', nextAppState);
+
+			if (nextAppState === 'background' || nextAppState === 'inactive') {
+				console.log('📱 App backgrounded - pausing camera');
+				setIsCameraActive(false);
+				setIsScanning(false);
+			} else if (
+				nextAppState === 'active' &&
+				isScreenFocused &&
+				mode === 'scan'
+			) {
+				console.log('📱 App foregrounded - resuming camera');
+				resetCameraInstance();
+			}
+		};
+
+		const subscription = AppState.addEventListener(
+			'change',
+			handleAppStateChange
+		);
+		return () => subscription?.remove();
+	}, [isScreenFocused, mode]);
+
 	// Helper function to close payment modal and reset scanning
 	const closePaymentModal = () => {
+		if (!isMounted) return;
+
 		setShowPaymentModal(false);
 		setPaymentData(null);
 		setAmount('');
@@ -43,10 +105,52 @@ export default function PaymentScreen() {
 		setIsScanning(true);
 	};
 
+	// Helper function to reset camera instance
+	const resetCameraInstance = () => {
+		if (!isMounted || !isScreenFocused) return;
+
+		console.log('📸 Resetting camera instance');
+
+		// Kill current camera
+		setIsCameraActive(false);
+		setIsScanning(false);
+
+		// Generate new camera key to force re-render
+		setCameraKey((prev) => prev + 1);
+
+		// Delay activation to ensure clean reset
+		setTimeout(() => {
+			if (isMounted && isScreenFocused && mode === 'scan') {
+				console.log('📸 Activating fresh camera instance');
+				setIsCameraActive(true);
+				setIsScanning(true);
+			}
+		}, 200);
+	};
+
+	// Helper function to safely reset scan state
+	const resetScanState = () => {
+		if (!isMounted) return;
+
+		console.log('🔄 Resetting scan state');
+		setScanResult(null);
+		setPaymentData(null);
+		setAmount('');
+		setNote('');
+		setShowPaymentModal(false);
+
+		// Reset camera if in scan mode
+		if (mode === 'scan' && isScreenFocused) {
+			resetCameraInstance();
+		}
+	};
+
 	// Generate default QR code (for receiving payments)
 	const generateDefaultQR = () => {
-		if (!currentProfile) {
-			console.log('🔍 [Payment] Waiting for user profile...');
+		if (!currentProfile || !isMounted) {
+			console.log(
+				'🔍 [Payment] Waiting for user profile or component unmounted...'
+			);
 			return;
 		}
 
@@ -72,6 +176,8 @@ export default function PaymentScreen() {
 
 	// Generate payment request QR code
 	const generateRequestQR = () => {
+		if (!isMounted) return;
+
 		if (!currentProfile) {
 			Alert.alert('Error', 'User profile not loaded');
 			return;
@@ -98,23 +204,45 @@ export default function PaymentScreen() {
 			requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
 		};
 
-		setQrData(JSON.stringify(paymentRequest));
-		setShowRequestModal(false);
+		if (isMounted) {
+			setQrData(JSON.stringify(paymentRequest));
+			setShowRequestModal(false);
 
-		Alert.alert(
-			'Payment Request QR Generated',
-			`Generated QR code requesting $${requestAmount} ${
-				requestNote ? `for "${requestNote}"` : ''
-			}`
-		);
+			Alert.alert(
+				'Payment Request QR Generated',
+				`Generated QR code requesting $${requestAmount} ${
+					requestNote ? `for "${requestNote}"` : ''
+				}`
+			);
+		}
 	};
+
+	// Handle mode changes and camera activation
+	useEffect(() => {
+		if (!isMounted || !isScreenFocused) return;
+
+		if (mode === 'scan') {
+			console.log('📸 Mode is scan - activating camera');
+			// Delay camera activation slightly to ensure clean state
+			const timer = setTimeout(() => {
+				if (isMounted && isScreenFocused && mode === 'scan') {
+					resetCameraInstance();
+				}
+			}, 100);
+			return () => clearTimeout(timer);
+		} else {
+			console.log('📸 Mode is not scan - deactivating camera');
+			setIsCameraActive(false);
+			setIsScanning(false);
+		}
+	}, [mode, isMounted, isScreenFocused]);
 
 	// Load default QR when switching to QR mode
 	useEffect(() => {
-		if (mode === 'qr' && currentProfile && !qrData) {
+		if (isMounted && mode === 'qr' && currentProfile && !qrData) {
 			generateDefaultQR();
 		}
-	}, [mode, currentProfile]);
+	}, [mode, currentProfile, isMounted]);
 
 	if (!permission) {
 		return (
@@ -148,21 +276,31 @@ export default function PaymentScreen() {
 	}
 
 	const handleQRCodeScanned = async (result: any) => {
-		// Prevent multiple scans
-		if (!isScanning) {
+		// Prevent multiple scans and check if component is still mounted
+		if (!isScanning || !isMounted || !isCameraActive || !result?.data) {
+			console.log('🔍 QR scan ignored - invalid state');
 			return;
 		}
 
 		console.log('🔍 QR Code scanned:', result.data);
-		setIsScanning(false);
-		setScanResult(result.data);
+
+		// Temporarily pause camera to prevent multiple scans
+		setIsCameraActive(false);
+
+		// Safely update state
+		if (isMounted) {
+			setIsScanning(false);
+			setScanResult(result.data);
+		}
 
 		try {
 			// Try to parse as payment request
 			const paymentRequest = JSON.parse(result.data);
 
-			if (paymentRequest.type === 'payment_request') {
+			if (paymentRequest && paymentRequest.type === 'payment_request') {
 				console.log('✅ Valid payment request found:', paymentRequest);
+
+				if (!isMounted) return; // Check again before updating state
 
 				setPaymentData(paymentRequest);
 
@@ -173,23 +311,25 @@ export default function PaymentScreen() {
 				) {
 					setAmount(''); // Clear amount so user can enter
 				} else {
-					setAmount(paymentRequest.amount.toString());
+					setAmount(String(paymentRequest.amount || ''));
 				}
 
 				setNote(paymentRequest.description || '');
 				setShowPaymentModal(true);
 			} else {
-				Alert.alert('QR Code Scanned', `Unsupported format: ${result.data}`);
-				// Re-enable scanning on error
-				setIsScanning(true);
-				setScanResult(null);
+				if (isMounted) {
+					Alert.alert('QR Code Scanned', `Unsupported format: ${result.data}`);
+					// Re-enable scanning on error
+					resetScanState();
+				}
 			}
 		} catch (error) {
 			console.error('❌ QR parsing error:', error);
-			Alert.alert('Invalid QR Code', 'Could not parse QR code data');
-			// Re-enable scanning on error
-			setIsScanning(true);
-			setScanResult(null);
+			if (isMounted) {
+				Alert.alert('Invalid QR Code', 'Could not parse QR code data');
+				// Re-enable scanning on error
+				resetScanState();
+			}
 		}
 	};
 
@@ -234,9 +374,12 @@ export default function PaymentScreen() {
 							mode === 'scan' ? 'bg-blue-600' : ''
 						}`}
 						onPress={() => {
-							setMode('scan');
-							setScanResult(null);
-							setIsScanning(true);
+							if (isMounted && mode !== 'scan') {
+								console.log('🔄 Switching to scan mode');
+								setMode('scan');
+								setIsCameraActive(false); // Kill current camera first
+								resetScanState();
+							}
 						}}
 					>
 						<Text
@@ -251,7 +394,15 @@ export default function PaymentScreen() {
 						className={`flex-1 items-center py-3 rounded-full ${
 							mode === 'qr' ? 'bg-blue-600' : ''
 						}`}
-						onPress={() => setMode('qr')}
+						onPress={() => {
+							if (isMounted && mode !== 'qr') {
+								console.log('🔄 Switching to QR mode');
+								setIsCameraActive(false); // Kill camera when switching to QR mode
+								setIsScanning(false);
+								setMode('qr');
+								resetScanState();
+							}
+						}}
 					>
 						<Text
 							className={`font-semibold ${
@@ -267,12 +418,15 @@ export default function PaymentScreen() {
 				{mode === 'scan' ? (
 					<View className='relative flex-1'>
 						{/* Camera View for Scan Mode */}
-						{!scanResult && (
+						{!scanResult && isCameraActive && (
 							<CameraView
+								key={`camera-${cameraKey}`} // Force re-render with new key
 								barcodeScannerSettings={{
 									barcodeTypes: ['qr'],
 								}}
-								onBarcodeScanned={isScanning ? handleQRCodeScanned : undefined}
+								onBarcodeScanned={
+									isScanning && isCameraActive ? handleQRCodeScanned : undefined
+								}
 								style={{
 									position: 'absolute',
 									width: '100%',
@@ -284,6 +438,14 @@ export default function PaymentScreen() {
 								}}
 								facing='back'
 							/>
+						)}
+
+						{/* Camera Loading State */}
+						{!scanResult && !isCameraActive && mode === 'scan' && (
+							<View className='absolute inset-0 items-center justify-center bg-black'>
+								<ActivityIndicator size='large' color='#ffffff' />
+								<Text className='mt-4 text-white'>Initializing Camera...</Text>
+							</View>
 						)}
 
 						{scanResult && (

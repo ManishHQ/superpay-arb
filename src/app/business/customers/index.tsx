@@ -149,10 +149,24 @@ export default function BusinessCustomers() {
 	);
 
 	const renderCustomerItem = (customer: CustomerData) => {
-		const avatarUrl = AvatarService.getAvatarUrl({
-			avatar_url: customer.avatar_url,
-			username: customer.username,
-		});
+		// Generate avatar URL with proper fallbacks
+		const getCustomerAvatarUrl = () => {
+			// If customer has a custom avatar, use it
+			if (customer.avatar_url && customer.avatar_url.trim()) {
+				return customer.avatar_url;
+			}
+
+			// Otherwise, generate a default avatar using username or fallback
+			const username =
+				customer.username ||
+				customer.display_name ||
+				customer.full_name ||
+				'customer';
+
+			return AvatarService.generateDefaultAvatar(username);
+		};
+
+		const avatarUrl = getCustomerAvatarUrl();
 
 		return (
 			<TouchableOpacity key={customer.id} style={styles.customerItem}>

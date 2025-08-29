@@ -228,10 +228,24 @@ export default function LoyaltyScreen() {
 	);
 
 	const renderCustomerItem = (customer: CustomerWithLoyalty, index: number) => {
-		const avatarUrl = AvatarService.getAvatarUrl({
-			avatar_url: customer.avatar_url,
-			username: customer.username,
-		});
+		// Generate avatar URL with proper fallbacks
+		const getCustomerAvatarUrl = () => {
+			// If customer has a custom avatar, use it
+			if (customer.avatar_url && customer.avatar_url.trim()) {
+				return customer.avatar_url;
+			}
+
+			// Otherwise, generate a default avatar using username or fallback
+			const username =
+				customer.username ||
+				customer.display_name ||
+				customer.full_name ||
+				`customer${index + 1}`;
+
+			return AvatarService.generateDefaultAvatar(username);
+		};
+
+		const avatarUrl = getCustomerAvatarUrl();
 
 		return (
 			<View key={customer.id} style={styles.customerItem}>
