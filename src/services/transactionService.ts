@@ -134,24 +134,49 @@ export class TransactionService {
 	}
 
 	/**
-	 * Get transactions for the current user
+	 * Get transactions for a specific user by user ID
 	 */
-	static async getUserTransactions(
+	static async getTransactionsByUserId(
+		userId: string,
 		limit?: number,
 		offset?: number
 	): Promise<TransactionWithUsers[]> {
-		try {
-			// Get the current wallet address
-			const walletAddress = useWalletStore.getState().address;
-			if (!walletAddress) {
-				throw new Error('No wallet connected');
-			}
+		return this.getUserTransactions(userId, offset, limit);
+	}
 
-			// Get the user profile by wallet address
-			const userProfile =
-				await this.getUserProfileByWalletAddress(walletAddress);
-			if (!userProfile) {
-				throw new Error('User profile not found for wallet address');
+	/**
+	 * Get transactions for the current user (legacy method - supports both wallet-based and user ID-based calls)
+	 */
+	static async getUserTransactions(
+		userIdOrLimit?: string | number,
+		offset?: number,
+		limitParam?: number
+	): Promise<TransactionWithUsers[]> {
+		try {
+			let userId: string;
+			let limit: number | undefined;
+
+			// Handle different parameter signatures
+			if (typeof userIdOrLimit === 'string') {
+				// Called with userId as first parameter
+				userId = userIdOrLimit;
+				limit = limitParam;
+			} else {
+				// Legacy call - get user ID from wallet
+				const walletAddress = useWalletStore.getState().address;
+				if (!walletAddress) {
+					throw new Error('No wallet connected');
+				}
+
+				// Get the user profile by wallet address
+				const userProfile =
+					await this.getUserProfileByWalletAddress(walletAddress);
+				if (!userProfile) {
+					throw new Error('User profile not found for wallet address');
+				}
+
+				userId = userProfile.id;
+				limit = userIdOrLimit as number;
 			}
 
 			let query = supabase
@@ -160,14 +185,14 @@ export class TransactionService {
 					`
           *,
           from_user:user_profiles!transactions_from_user_id_fkey(
-            id, username, full_name, avatar_url, wallet_address
+            id, username, full_name, display_name, avatar_url, wallet_address
           ),
           to_user:user_profiles!transactions_to_user_id_fkey(
-            id, username, full_name, avatar_url, wallet_address
+            id, username, full_name, display_name, avatar_url, wallet_address
           )
         `
 				)
-				.or(`from_user_id.eq.${userProfile.id},to_user_id.eq.${userProfile.id}`)
+				.or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
 				.order('created_at', { ascending: false });
 
 			if (limit) query = query.limit(limit);

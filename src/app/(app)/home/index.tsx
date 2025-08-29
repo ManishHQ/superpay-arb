@@ -258,6 +258,7 @@ export default function HomeScreen() {
 
 		setActivityLoading(true);
 		try {
+			// For regular home page, use the legacy method that works with wallet
 			const transactions = await TransactionService.getUserTransactions(5); // Get last 5 transactions
 
 			// Transform transactions to activity format

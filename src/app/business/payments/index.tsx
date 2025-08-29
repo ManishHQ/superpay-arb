@@ -39,20 +39,7 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: '#111827',
 	},
-	createButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#3b82f6',
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		borderRadius: 12,
-		gap: 6,
-	},
-	createButtonText: {
-		color: '#ffffff',
-		fontSize: 14,
-		fontWeight: '600',
-	},
+
 	tabContainer: {
 		flexDirection: 'row',
 		backgroundColor: '#f3f4f6',
@@ -321,7 +308,7 @@ const styles = StyleSheet.create({
 });
 
 export default function PaymentRequestsPage() {
-	const [mode, setMode] = useState<'scan' | 'receive' | 'requests'>('requests');
+	const [mode, setMode] = useState<'scan' | 'receive'>('scan');
 	const [permission, requestPermission] = useCameraPermissions();
 	const [scanResult, setScanResult] = useState<string | null>(null);
 	const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -333,7 +320,7 @@ export default function PaymentRequestsPage() {
 	const [requestNote, setRequestNote] = useState('');
 	const [qrData, setQrData] = useState<string>('');
 	const [showRequestModal, setShowRequestModal] = useState(false);
-	const [showCreateModal, setShowCreateModal] = useState(false);
+
 	const [isScanning, setIsScanning] = useState(true);
 
 	const { currentProfile } = useUserProfileStore();
@@ -563,19 +550,6 @@ export default function PaymentRequestsPage() {
 			style={{ flex: 1 }}
 		>
 			<SafeAreaView style={styles.container}>
-				<View style={styles.header}>
-					<Text style={styles.headerTitle}>Business Payments</Text>
-					{mode === 'requests' && (
-						<TouchableOpacity
-							style={styles.createButton}
-							onPress={() => setShowCreateModal(true)}
-						>
-							<Ionicons name='add' size={18} color='#ffffff' />
-							<Text style={styles.createButtonText}>New Request</Text>
-						</TouchableOpacity>
-					)}
-				</View>
-
 				{/* Tab Navigation */}
 				<View style={styles.tabContainer}>
 					<TouchableOpacity
@@ -603,19 +577,6 @@ export default function PaymentRequestsPage() {
 							]}
 						>
 							Receive
-						</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={[styles.tabButton, mode === 'requests' && styles.activeTab]}
-						onPress={() => setMode('requests')}
-					>
-						<Text
-							style={[
-								styles.tabText,
-								mode === 'requests' && styles.activeTabText,
-							]}
-						>
-							Requests
 						</Text>
 					</TouchableOpacity>
 				</View>
@@ -774,8 +735,6 @@ export default function PaymentRequestsPage() {
 						</Text>
 					</ScrollView>
 				)}
-
-				{mode === 'requests' && <PaymentRequestsList />}
 
 				{/* Payment Modal */}
 				<Modal
@@ -984,16 +943,6 @@ export default function PaymentRequestsPage() {
 						</View>
 					</KeyboardAvoidingView>
 				</Modal>
-
-				{/* Original Create Request Modal */}
-				<PaymentRequestModal
-					visible={showCreateModal}
-					onClose={() => setShowCreateModal(false)}
-					onRequestSent={(requestData) => {
-						console.log('Payment request sent:', requestData);
-						setShowCreateModal(false);
-					}}
-				/>
 			</SafeAreaView>
 		</KeyboardAvoidingView>
 	);

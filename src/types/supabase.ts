@@ -24,6 +24,9 @@ export type Database = {
 					dynamic_user_id: string | null;
 					display_name: string | null;
 					bio: string | null;
+					phone: string | null;
+					website: string | null;
+					address: string | null;
 					is_active: boolean;
 					is_verified: boolean;
 					show_wallet_address: boolean;
@@ -47,6 +50,9 @@ export type Database = {
 					dynamic_user_id?: string | null;
 					display_name?: string | null;
 					bio?: string | null;
+					phone?: string | null;
+					website?: string | null;
+					address?: string | null;
 					is_active?: boolean;
 					is_verified?: boolean;
 					show_wallet_address?: boolean;
@@ -70,6 +76,9 @@ export type Database = {
 					dynamic_user_id?: string | null;
 					display_name?: string | null;
 					bio?: string | null;
+					phone?: string | null;
+					website?: string | null;
+					address?: string | null;
 					is_active?: boolean;
 					is_verified?: boolean;
 					show_wallet_address?: boolean;

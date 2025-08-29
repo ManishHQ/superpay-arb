@@ -311,18 +311,27 @@ export default function BusinessDashboard() {
 		currentProfile?.display_name ||
 		currentProfile?.full_name ||
 		'Business Owner';
-	const avatarUrl = AvatarService.getAvatarUrl({
-		avatar_url: currentProfile?.avatar_url,
-		username: currentProfile?.username || 'business',
-	});
+	// Generate avatar URL with proper fallbacks
+	const getAvatarUrl = () => {
+		// If user has a custom avatar, use it with cache-busting
+		if (currentProfile?.avatar_url && currentProfile.avatar_url.trim()) {
+			return `${currentProfile.avatar_url}?v=${currentProfile?.updated_at || Date.now()}`;
+		}
+
+		// Otherwise, generate a default avatar using username or fallback
+		const username =
+			currentProfile?.username ||
+			currentProfile?.business_name ||
+			currentProfile?.display_name ||
+			currentProfile?.full_name ||
+			'business';
+
+		return AvatarService.generateDefaultAvatar(username);
+	};
 
 	// Ensure we have fallback values
 	const safeDisplayName = displayName || 'Business Owner';
-	const safeAvatarUrl =
-		avatarUrl ||
-		AvatarService.getAvatarUrl({
-			username: currentProfile?.username || 'business',
-		});
+	const safeAvatarUrl = getAvatarUrl();
 
 	// Get wallet balance data
 	const primaryWallet = wallets.userWallets?.[0];

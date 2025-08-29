@@ -170,8 +170,24 @@ export class UserProfileService {
 		limit: number = 10
 	): Promise<UserProfile[]> {
 		try {
+			// Get current user ID from wallet address
+			let requesting_user_id = null;
+			try {
+				const { useWalletStore } = await import('../stores/walletStore');
+				const { address: walletAddress } = useWalletStore.getState();
+				if (walletAddress) {
+					const currentUser = await this.getProfileByWalletAddress(walletAddress);
+					requesting_user_id = currentUser?.id || null;
+				}
+			} catch (error) {
+				console.log('Could not get current user ID for search:', error);
+			}
+
 			const { data, error } = await supabase
-				.rpc('search_users', { search_term: searchTerm })
+				.rpc('search_users', { 
+					search_term: searchTerm,
+					requesting_user_id: requesting_user_id 
+				})
 				.limit(limit);
 
 			if (error) {

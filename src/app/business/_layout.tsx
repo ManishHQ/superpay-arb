@@ -155,15 +155,24 @@ export default function BusinessLayout() {
 		currentProfile?.display_name ||
 		currentProfile?.full_name ||
 		'Business Owner';
-	const avatarUrl = AvatarService.getAvatarUrl({
-		avatar_url: currentProfile?.avatar_url,
-		username: currentProfile?.username || 'business',
-	});
+	// Generate avatar URL with proper fallbacks
+	const getAvatarUrl = () => {
+		// If user has a custom avatar, use it with cache-busting
+		if (currentProfile?.avatar_url && currentProfile.avatar_url.trim()) {
+			return `${currentProfile.avatar_url}?v=${currentProfile?.updated_at || Date.now()}`;
+		}
 
-	// Add cache-busting for avatar updates
-	const cacheBustedAvatarUrl = currentProfile?.avatar_url
-		? `${avatarUrl}?v=${currentProfile?.updated_at || Date.now()}`
-		: avatarUrl;
+		// Otherwise, generate a default avatar using username or fallback
+		const username =
+			currentProfile?.username ||
+			currentProfile?.business_name ||
+			currentProfile?.display_name ||
+			'business';
+
+		return AvatarService.generateDefaultAvatar(username);
+	};
+
+	const cacheBustedAvatarUrl = getAvatarUrl();
 
 	const navigationItems = [
 		{

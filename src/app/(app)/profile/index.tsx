@@ -248,278 +248,397 @@ export default function ProfileScreen() {
 					</View>
 				</View>
 
-				{/* Quick Stats Card */}
-				<LinearGradient
-					colors={['#3D5AFE', '#00C896']}
-					start={{ x: 0, y: 0 }}
-					end={{ x: 1, y: 0 }}
-					style={{
-						padding: 16,
-						borderRadius: 16,
-						marginBottom: 24,
-					}}
-				>
-					<View className='flex-row items-center justify-between mb-6'>
-						<View>
-							<Text
-								style={{ color: 'rgba(255, 255, 255, 0.95)' }}
-								className='text-xl font-semibold'
-							>
-								Your Activity
-							</Text>
-							<Text
-								style={{ color: 'rgba(255, 255, 255, 0.8)' }}
-								className='text-sm'
-							>
-								This month's overview
-							</Text>
-						</View>
-						<TouchableOpacity
-							onPress={() => setPortfolioVisible(!portfolioVisible)}
-						>
-							<Ionicons
-								name={portfolioVisible ? 'eye' : 'eye-off'}
-								size={24}
-								color='white'
-							/>
-						</TouchableOpacity>
-					</View>
-
-					<View>
-						<View className='flex-row justify-between mb-4'>
-							<View
-								className='flex-1 p-4 mr-2 rounded-xl'
-								style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-							>
-								<Text className='text-2xl font-bold text-white'>
-									{userStats.totalTransactions}
-								</Text>
-								<Text
-									style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-									className='text-sm'
-								>
-									Transactions
-								</Text>
-							</View>
-							<View
-								className='flex-1 p-4 ml-2 rounded-xl'
-								style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-							>
-								<Text className='text-2xl font-bold text-white'>
-									{userStats.activeGroups}
-								</Text>
-								<Text
-									style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-									className='text-sm'
-								>
-									Active Groups
-								</Text>
-							</View>
-						</View>
-						<View className='flex-row justify-between'>
-							<View
-								className='flex-1 p-4 mr-2 rounded-xl'
-								style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-							>
-								<Text className='text-2xl font-bold text-white'>
-									{userStats.friendsConnected}
-								</Text>
-								<Text
-									style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-									className='text-sm'
-								>
-									Friends
-								</Text>
-							</View>
-							<View
-								className='flex-1 p-4 ml-2 rounded-xl'
-								style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-							>
-								<Text className='text-2xl font-bold text-white'>
-									{portfolioVisible
-										? `$${userStats.portfolioValue.toLocaleString()}`
-										: '•••••'}
-								</Text>
-								<Text
-									style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-									className='text-sm'
-								>
-									Portfolio Value
-								</Text>
-							</View>
-						</View>
-					</View>
-				</LinearGradient>
-
-				{/* SuperPay Card Section */}
-				<View className='mb-6'>
-					<View className='relative'>
-						{/* Card Container */}
-						<LinearGradient
-							colors={['#1e3a8a', '#3b82f6', '#6366f1']}
-							start={{ x: 0, y: 0 }}
-							end={{ x: 1, y: 1 }}
-							className='p-6 rounded-2xl shadow-lg'
+				{/* Cards Container - Responsive Layout */}
+				<View className='px-4 mb-6'>
+					{/* SuperPay Card Section */}
+					<View className='mb-6 md:mb-8'>
+						<View
+							className='relative mx-auto md:max-w-md lg:max-w-lg'
 							style={{
-								shadowColor: '#000',
-								shadowOffset: { width: 0, height: 8 },
-								shadowOpacity: 0.3,
-								shadowRadius: 12,
-								elevation: 12,
+								width: '100%',
+								maxWidth: 400,
+								aspectRatio: 340 / 214,
 							}}
 						>
-							{/* Card Background Pattern */}
-							<View className='absolute top-0 right-0 opacity-10'>
-								<View className='w-32 h-32 bg-white rounded-full -mr-16 -mt-16' />
-							</View>
-							<View className='absolute bottom-0 left-0 opacity-5'>
-								<View className='w-24 h-24 bg-white rounded-full -ml-12 -mb-12' />
-							</View>
+							{/* Card Container */}
+							<LinearGradient
+								colors={['#1e1b4b', '#3730a3', '#4338ca']}
+								start={{ x: 0, y: 0 }}
+								end={{ x: 1, y: 1 }}
+								style={{
+									width: '100%',
+									aspectRatio: 340 / 214,
+									borderRadius: 16,
+									padding: 24,
+									shadowColor: '#000',
+									shadowOffset: { width: 0, height: 12 },
+									shadowOpacity: 0.4,
+									shadowRadius: 16,
+									elevation: 16,
+								}}
+							>
+								{/* Card Background Patterns */}
+								<View
+									style={{
+										position: 'absolute',
+										top: -20,
+										right: -20,
+										width: 80,
+										height: 80,
+										borderRadius: 40,
+										backgroundColor: 'rgba(255, 255, 255, 0.08)',
+									}}
+								/>
+								<View
+									style={{
+										position: 'absolute',
+										bottom: -30,
+										left: -30,
+										width: 100,
+										height: 100,
+										borderRadius: 50,
+										backgroundColor: 'rgba(255, 255, 255, 0.05)',
+									}}
+								/>
+								<View
+									style={{
+										position: 'absolute',
+										top: 50,
+										right: 40,
+										width: 40,
+										height: 40,
+										borderRadius: 20,
+										backgroundColor: 'rgba(255, 255, 255, 0.06)',
+									}}
+								/>
 
-							{/* Card Header */}
-							<View className='flex-row justify-between items-start mb-8'>
+								{/* Card Header */}
+								<View
+									style={{
+										flexDirection: 'row',
+										justifyContent: 'space-between',
+										alignItems: 'flex-start',
+										marginBottom: 32,
+									}}
+								>
+									<View>
+										<Text
+											style={{
+												color: '#ffffff',
+												fontSize: 16,
+												fontWeight: '600',
+												opacity: 0.95,
+											}}
+										>
+											SuperPay
+										</Text>
+										<Text
+											style={{
+												color: '#ffffff',
+												fontSize: 12,
+												opacity: 0.75,
+												marginTop: 2,
+											}}
+										>
+											Premium Wallet
+										</Text>
+									</View>
+									<View
+										style={{
+											backgroundColor: 'rgba(255, 255, 255, 0.25)',
+											borderRadius: 8,
+											paddingHorizontal: 12,
+											paddingVertical: 6,
+											borderWidth: 1,
+											borderColor: 'rgba(255, 255, 255, 0.3)',
+										}}
+									>
+										<Text
+											style={{
+												color: '#ffffff',
+												fontSize: 14,
+												fontWeight: '700',
+												letterSpacing: 1,
+											}}
+										>
+											VISA
+										</Text>
+									</View>
+								</View>
+
+								{/* Card Number */}
+								<View style={{ marginBottom: 24 }}>
+									<Text
+										style={{
+											color: '#ffffff',
+											fontSize: 22,
+											fontFamily: 'monospace',
+											letterSpacing: 4,
+											fontWeight: '500',
+										}}
+									>
+										•••• •••• •••• ••••
+									</Text>
+								</View>
+
+								{/* Card Details */}
+								<View
+									style={{
+										flexDirection: 'row',
+										justifyContent: 'space-between',
+										alignItems: 'flex-end',
+									}}
+								>
+									<View style={{ flex: 1 }}>
+										<Text
+											style={{
+												color: '#ffffff',
+												fontSize: 10,
+												opacity: 0.7,
+												marginBottom: 4,
+												letterSpacing: 0.5,
+											}}
+										>
+											CARDHOLDER NAME
+										</Text>
+										<Text
+											style={{
+												color: '#ffffff',
+												fontSize: 14,
+												fontWeight: '600',
+											}}
+											numberOfLines={1}
+										>
+											{userData.fullName.toUpperCase()}
+										</Text>
+									</View>
+									<View style={{ alignItems: 'flex-end' }}>
+										<Text
+											style={{
+												color: '#ffffff',
+												fontSize: 10,
+												opacity: 0.7,
+												marginBottom: 4,
+												letterSpacing: 0.5,
+											}}
+										>
+											VALID THRU
+										</Text>
+										<Text
+											style={{
+												color: '#ffffff',
+												fontSize: 14,
+												fontWeight: '600',
+												fontFamily: 'monospace',
+											}}
+										>
+											••/••
+										</Text>
+									</View>
+								</View>
+
+								{/* Coming Soon Overlay */}
+								<View
+									style={{
+										position: 'absolute',
+										top: 0,
+										left: 0,
+										right: 0,
+										bottom: 0,
+										backgroundColor: 'rgba(0, 0, 0, 0.6)',
+										borderRadius: 16,
+										justifyContent: 'center',
+										alignItems: 'center',
+									}}
+								>
+									<View
+										style={{
+											backgroundColor: 'rgba(255, 255, 255, 0.15)',
+											borderRadius: 16,
+											paddingHorizontal: 32,
+											paddingVertical: 16,
+											borderWidth: 1,
+											borderColor: 'rgba(255, 255, 255, 0.2)',
+										}}
+									>
+										<Text
+											style={{
+												color: '#ffffff',
+												fontSize: 20,
+												fontWeight: '700',
+												textAlign: 'center',
+											}}
+										>
+											Coming Soon
+										</Text>
+										<Text
+											style={{
+												color: '#ffffff',
+												fontSize: 14,
+												opacity: 0.9,
+												textAlign: 'center',
+												marginTop: 4,
+											}}
+										>
+											Physical & Virtual Cards
+										</Text>
+									</View>
+								</View>
+							</LinearGradient>
+						</View>
+					</View>
+
+					{/* Quick Stats Card */}
+					<View className='mb-6 md:mb-8'>
+						<LinearGradient
+							colors={['#3D5AFE', '#00C896']}
+							start={{ x: 0, y: 0 }}
+							end={{ x: 1, y: 0 }}
+							style={{
+								padding: 20,
+								borderRadius: 16,
+								marginHorizontal: 'auto',
+								maxWidth: 600,
+								width: '100%',
+							}}
+							className='md:p-6'
+						>
+							<View className='flex-row items-center justify-between mb-6'>
 								<View>
-									<Text className='text-white text-lg font-semibold opacity-90'>
-										SuperPay Card
+									<Text
+										style={{ color: 'rgba(255, 255, 255, 0.95)' }}
+										className='text-xl font-semibold'
+									>
+										Your Activity
 									</Text>
-									<Text className='text-white text-sm opacity-70'>
-										Digital Payments
+									<Text
+										style={{ color: 'rgba(255, 255, 255, 0.8)' }}
+										className='text-sm'
+									>
+										This month's overview
 									</Text>
 								</View>
-								<View className='bg-white bg-opacity-20 rounded-lg px-3 py-1'>
-									<Text className='text-white text-xs font-bold'>VISA</Text>
-								</View>
+								<TouchableOpacity
+									onPress={() => setPortfolioVisible(!portfolioVisible)}
+								>
+									<Ionicons
+										name={portfolioVisible ? 'eye' : 'eye-off'}
+										size={24}
+										color='white'
+									/>
+								</TouchableOpacity>
 							</View>
 
-							{/* Card Number */}
-							<View className='mb-6'>
-								<Text className='text-white text-xl font-mono tracking-wider'>
-									•••• •••• •••• ••••
-								</Text>
-							</View>
-
-							{/* Card Details */}
-							<View className='flex-row justify-between items-end'>
-								<View>
-									<Text className='text-white text-xs opacity-70 mb-1'>
-										CARDHOLDER NAME
-									</Text>
-									<Text className='text-white text-base font-semibold'>
-										{userData.fullName.toUpperCase()}
-									</Text>
+							{/* Stats Grid - Responsive Layout */}
+							<View className='md:max-w-lg md:mx-auto'>
+								<View className='flex-row justify-between mb-4 md:mb-6'>
+									<View
+										className='flex-1 p-4 mr-2 rounded-xl md:p-6 md:mr-3'
+										style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+									>
+										<Text className='text-2xl font-bold text-white md:text-3xl'>
+											{userStats.totalTransactions}
+										</Text>
+										<Text
+											style={{ color: 'rgba(255, 255, 255, 0.9)' }}
+											className='text-sm md:text-base'
+										>
+											Transactions
+										</Text>
+									</View>
+									<View
+										className='flex-1 p-4 ml-2 rounded-xl md:p-6 md:ml-3'
+										style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+									>
+										<Text className='text-2xl font-bold text-white md:text-3xl'>
+											{userStats.activeGroups}
+										</Text>
+										<Text
+											style={{ color: 'rgba(255, 255, 255, 0.9)' }}
+											className='text-sm md:text-base'
+										>
+											Active Groups
+										</Text>
+									</View>
 								</View>
-								<View className='items-end'>
-									<Text className='text-white text-xs opacity-70 mb-1'>
-										VALID THRU
-									</Text>
-									<Text className='text-white text-base font-semibold'>
-										••/••
-									</Text>
-								</View>
-							</View>
-
-							{/* Coming Soon Overlay */}
-							<View className='absolute inset-0 bg-black bg-opacity-40 rounded-2xl flex-1 justify-center items-center'>
-								<View className='bg-white bg-opacity-20 backdrop-blur-sm rounded-xl px-6 py-3'>
-									<Text className='text-white text-lg font-bold text-center'>
-										Coming Soon
-									</Text>
-									<Text className='text-white text-sm opacity-90 text-center mt-1'>
-										Physical & Virtual Cards
-									</Text>
+								<View className='flex-row justify-between'>
+									<View
+										className='flex-1 p-4 mr-2 rounded-xl md:p-6 md:mr-3'
+										style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+									>
+										<Text className='text-2xl font-bold text-white md:text-3xl'>
+											{userStats.friendsConnected}
+										</Text>
+										<Text
+											style={{ color: 'rgba(255, 255, 255, 0.9)' }}
+											className='text-sm md:text-base'
+										>
+											Friends
+										</Text>
+									</View>
+									<View
+										className='flex-1 p-4 ml-2 rounded-xl md:p-6 md:ml-3'
+										style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+									>
+										<Text className='text-2xl font-bold text-white md:text-3xl'>
+											{portfolioVisible
+												? `$${userStats.portfolioValue.toLocaleString()}`
+												: '•••••'}
+										</Text>
+										<Text
+											style={{ color: 'rgba(255, 255, 255, 0.9)' }}
+											className='text-sm md:text-base'
+										>
+											Portfolio Value
+										</Text>
+									</View>
 								</View>
 							</View>
 						</LinearGradient>
-
-						{/* Card Features */}
-						<View className='mt-4 px-4'>
-							<Text className='text-gray-600 text-sm text-center mb-3'>
-								Get ready for the future of payments
-							</Text>
-							<View className='flex-row justify-around'>
-								<View className='items-center'>
-									<View className='w-10 h-10 bg-blue-100 rounded-full items-center justify-center mb-2'>
-										<Ionicons name='card' size={20} color='#3b82f6' />
-									</View>
-									<Text className='text-xs text-gray-600 text-center'>
-										Contactless{'\n'}Payments
-									</Text>
-								</View>
-								<View className='items-center'>
-									<View className='w-10 h-10 bg-green-100 rounded-full items-center justify-center mb-2'>
-										<Ionicons
-											name='shield-checkmark'
-											size={20}
-											color='#10b981'
-										/>
-									</View>
-									<Text className='text-xs text-gray-600 text-center'>
-										Secure{'\n'}Transactions
-									</Text>
-								</View>
-								<View className='items-center'>
-									<View className='w-10 h-10 bg-purple-100 rounded-full items-center justify-center mb-2'>
-										<Ionicons name='globe' size={20} color='#8b5cf6' />
-									</View>
-									<Text className='text-xs text-gray-600 text-center'>
-										Global{'\n'}Acceptance
-									</Text>
-								</View>
-								<View className='items-center'>
-									<View className='w-10 h-10 bg-orange-100 rounded-full items-center justify-center mb-2'>
-										<Ionicons name='flash' size={20} color='#f59e0b' />
-									</View>
-									<Text className='text-xs text-gray-600 text-center'>
-										Instant{'\n'}Rewards
-									</Text>
-								</View>
-							</View>
-						</View>
 					</View>
 				</View>
-
 				{/* Primary Actions Section */}
-				<View className='p-8 mb-6 bg-white shadow-sm rounded-2xl'>
-					<Text className='mb-6 text-xl font-semibold text-gray-900'>
+				<View className='p-6 mb-6 bg-white shadow-sm rounded-2xl md:p-8 md:max-w-2xl md:mx-auto'>
+					<Text className='mb-6 text-xl font-semibold text-gray-900 md:text-2xl md:text-center'>
 						Quick Actions
 					</Text>
 					<View>
-						<View className='flex-row justify-between mb-4'>
+						<View className='flex-row justify-between mb-4 md:mb-6'>
 							<TouchableOpacity
-								className='flex-row items-center flex-1 p-4 mr-2 bg-gray-50 rounded-xl'
+								className='flex-row items-center flex-1 p-4 mr-2 bg-gray-50 rounded-xl md:p-6 md:mr-3'
 								onPress={handleEditProfile}
 							>
 								<Ionicons name='person-circle' size={24} color='#3D5AFE' />
-								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700'>
+								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700 md:text-base'>
 									Edit Profile
 								</Text>
 							</TouchableOpacity>
 							<TouchableOpacity
-								className='flex-row items-center flex-1 p-4 ml-2 bg-gray-50 rounded-xl'
+								className='flex-row items-center flex-1 p-4 ml-2 bg-gray-50 rounded-xl md:p-6 md:ml-3'
 								onPress={handleShareProfile}
 							>
 								<Ionicons name='share' size={24} color='#3D5AFE' />
-								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700'>
+								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700 md:text-base'>
 									Share Profile
 								</Text>
 							</TouchableOpacity>
 						</View>
 						<View className='flex-row justify-between'>
 							<TouchableOpacity
-								className='flex-row items-center flex-1 p-4 mr-2 bg-gray-50 rounded-xl'
+								className='flex-row items-center flex-1 p-4 mr-2 bg-gray-50 rounded-xl md:p-6 md:mr-3'
 								onPress={handleQRCode}
 							>
 								<Ionicons name='qr-code' size={24} color='#3D5AFE' />
-								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700'>
+								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700 md:text-base'>
 									Generate QR
 								</Text>
 							</TouchableOpacity>
 							<TouchableOpacity
-								className='flex-row items-center flex-1 p-4 ml-2 bg-gray-50 rounded-xl'
+								className='flex-row items-center flex-1 p-4 ml-2 bg-gray-50 rounded-xl md:p-6 md:ml-3'
 								onPress={handlePrivacySettings}
 							>
 								<Ionicons name='shield-checkmark' size={24} color='#3D5AFE' />
-								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700'>
+								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700 md:text-base'>
 									Privacy
 								</Text>
 							</TouchableOpacity>
