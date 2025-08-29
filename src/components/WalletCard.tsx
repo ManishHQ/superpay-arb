@@ -28,7 +28,10 @@ export const WalletCard: React.FC<WalletCardProps> = ({
 			colors={['#3D5AFE', '#00C896']}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 0 }}
-			className={`rounded-2xl p-6 ${className}`}
+			style={{
+				borderRadius: 16,
+				padding: 20,
+			}}
 		>
 			<Text
 				style={{ color: 'rgba(255, 255, 255, 0.9)' }}

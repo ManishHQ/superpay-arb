@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { dynamicClient } from '@/lib/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useReactiveClient } from '@dynamic-labs/react-hooks';
 
 export default function LoginPage() {
 	const [usedOneTimePasswordMethod, setUsedOneTimePasswordMethod] = useState<
@@ -11,54 +12,16 @@ export default function LoginPage() {
 	const [email, setEmail] = useState('');
 	const [phone, setPhone] = useState('');
 	const [otpToken, setOtpToken] = useState('');
-	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
-	const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-
-	// Check for existing authentication token on mount
-	useEffect(() => {
-		checkExistingAuth();
-	}, []);
-
-	// Navigate to home when authentication state changes
-	useEffect(() => {
-		if (isAuthenticated && !isCheckingAuth) {
-			console.log('User authenticated, navigating to home');
-			router.replace('/(tabs)/home');
-		}
-	}, [isAuthenticated, isCheckingAuth]);
-
-	const checkExistingAuth = async () => {
-		try {
-			const token = await AsyncStorage.getItem('authToken');
-			if (token) {
-				console.log('Found existing auth token');
-				setIsAuthenticated(true);
-			}
-		} catch (error) {
-			console.error('Error checking existing auth:', error);
-		} finally {
-			setIsCheckingAuth(false);
-		}
-	};
+	const { auth } = useReactiveClient(dynamicClient);
 
 	const storeAuthToken = async (token: string) => {
 		try {
 			await AsyncStorage.setItem('authToken', token);
 			console.log('Auth token stored successfully');
-			setIsAuthenticated(true);
+			router.replace('/(tabs)/home');
 		} catch (error) {
 			console.error('Error storing auth token:', error);
-		}
-	};
-
-	const clearAuthToken = async () => {
-		try {
-			await AsyncStorage.removeItem('authToken');
-			console.log('Auth token cleared');
-			setIsAuthenticated(false);
-		} catch (error) {
-			console.error('Error clearing auth token:', error);
 		}
 	};
 
@@ -342,34 +305,6 @@ export default function LoginPage() {
 			</>
 		);
 	};
-
-	// Show loading screen while checking authentication
-	if (isCheckingAuth) {
-		return (
-			<View className='items-center justify-center flex-1 bg-gray-50'>
-				<View className='items-center'>
-					<Text className='mb-4 text-2xl font-bold text-gray-800'>
-						SuperPay
-					</Text>
-					<Text className='text-gray-600'>Checking authentication...</Text>
-				</View>
-			</View>
-		);
-	}
-
-	// If already authenticated, don't show login form
-	if (isAuthenticated) {
-		return (
-			<View className='items-center justify-center flex-1 bg-gray-50'>
-				<View className='items-center'>
-					<Text className='mb-4 text-2xl font-bold text-gray-800'>
-						SuperPay
-					</Text>
-					<Text className='text-gray-600'>Redirecting to home...</Text>
-				</View>
-			</View>
-		);
-	}
 
 	return (
 		<View className='justify-center flex-1 p-5 bg-gray-50'>

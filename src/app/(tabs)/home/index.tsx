@@ -130,6 +130,13 @@ export default function HomeScreen() {
 	const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
 	const [isWalletLoading, setIsWalletLoading] = useState(false);
 
+	// Check if wallet is actually connected
+	const isWalletConnected = auth.token && wallets.userWallets.length > 0;
+
+	console.log('isWalletConnected', isWalletConnected);
+	console.log('wallets.userWallets', wallets.userWallets);
+	console.log('auth.token', auth.token);
+
 	// Update greeting based on time of day
 	useEffect(() => {
 		const updateGreeting = () => {
@@ -153,12 +160,14 @@ export default function HomeScreen() {
 	useEffect(() => {
 		const fetchWalletData = async () => {
 			try {
-				if (auth.token && wallets.userWallets.length > 0) {
-					const connectedWallet = wallets.userWallets[0];
-					console.log('Connected wallet:', connectedWallet);
+				if (isWalletConnected) {
+					setIsWalletLoading(true);
+					const wallet = wallets.userWallets[0];
+					setConnectedWallet(wallet);
+					console.log('Connected wallet:', wallet);
 
 					// Get wallet address
-					const address = connectedWallet.address;
+					const address = wallet.address;
 
 					// Try to get balances using Viem extension
 					if (publicClient) {
@@ -191,20 +200,30 @@ export default function HomeScreen() {
 					}
 				} else {
 					setWalletData(defaultBalances);
+					setConnectedWallet(null);
 				}
 			} catch (error) {
 				console.error('Error in fetchWalletData:', error);
 				setWalletData(defaultBalances);
+			} finally {
+				setIsWalletLoading(false);
 			}
 		};
 
 		fetchWalletData();
 
-		// Refresh wallet data every 30 seconds
-		const walletInterval = setInterval(fetchWalletData, 30000);
+		// Refresh wallet data every 30 seconds when connected
+		let walletInterval: NodeJS.Timeout | null = null;
+		if (isWalletConnected) {
+			walletInterval = setInterval(fetchWalletData, 30000);
+		}
 
-		return () => clearInterval(walletInterval);
-	}, [auth.token, wallets.userWallets, publicClient]);
+		return () => {
+			if (walletInterval) {
+				clearInterval(walletInterval);
+			}
+		};
+	}, [isWalletConnected, wallets.userWallets, publicClient]);
 
 	// Update user data from Dynamic auth
 	useEffect(() => {
@@ -323,7 +342,7 @@ export default function HomeScreen() {
 				/>
 
 				{/* Connection Status */}
-				{!auth.token && (
+				{!isWalletConnected && (
 					<View className='p-4 mb-4 border border-yellow-200 bg-yellow-50 rounded-xl'>
 						<View className='flex-row items-center justify-between'>
 							<View className='flex-1'>
@@ -349,51 +368,16 @@ export default function HomeScreen() {
 
 				{/* Balance Card */}
 				<View className='mb-6'>
-					<View className='flex-row items-center justify-between mb-2'>
-						<Text className='text-sm text-gray-500'>
-							Tap to change wallet style
-						</Text>
-						<View className='flex-row items-center gap-2'>
-							<View
-								className={`w-2 h-2 rounded-full ${auth.token ? 'bg-green-500' : 'bg-red-500'}`}
-							/>
-							<Text className='text-xs text-gray-400'>
-								{auth.token ? 'Connected' : 'Not Connected'}
-							</Text>
-							<Text className='text-xs text-gray-400'>
-								• {currentWalletConfig.name}
-							</Text>
-							{isWalletLoading && (
-								<View className='w-2 h-2 bg-blue-500 rounded-full animate-pulse' />
-							)}
-						</View>
-					</View>
-					<TouchableOpacity onPress={cycleWalletConfig} activeOpacity={0.8}>
-						<WalletCard
-							usdcBalance={walletData.usdcBalance}
-							ethBalance={walletData.ethBalance}
-							walletAddress={walletData.walletAddress}
-							onSendPress={handleSend}
-							gradientColors={currentWalletConfig.gradientColors}
-							showEthBalance={currentWalletConfig.showEthBalance}
-							showWalletAddress={currentWalletConfig.showWalletAddress}
-						/>
-					</TouchableOpacity>
+					<WalletCard
+						usdcBalance={walletData.usdcBalance}
+						ethBalance={walletData.ethBalance}
+						walletAddress={walletData.walletAddress}
+						onSendPress={handleSend}
+						gradientColors={currentWalletConfig.gradientColors}
+						showEthBalance={currentWalletConfig.showEthBalance}
+						showWalletAddress={currentWalletConfig.showWalletAddress}
+					/>
 				</View>
-
-				{/* Disconnect Button */}
-				{auth.token && (
-					<View className='flex-row justify-end mb-6'>
-						<TouchableOpacity
-							className='px-4 py-2 bg-red-100 border border-red-300 rounded-lg'
-							onPress={handleDisconnect}
-						>
-							<Text className='text-sm font-medium text-red-700'>
-								Disconnect Wallet
-							</Text>
-						</TouchableOpacity>
-					</View>
-				)}
 
 				{/* Quick Stats */}
 				<QuickStats
@@ -411,24 +395,9 @@ export default function HomeScreen() {
 				<RecentActivity
 					activities={mockRecentActivity}
 					onViewAll={handleViewAllActivity}
-				/>
-
-				{/* XP Progress */}
-				<XPProgress
-					level={8}
-					currentXP={1247}
-					nextLevelXP={1500}
-					progressPercentage={75}
+					className='mb-28'
 				/>
 			</ScrollView>
-
-			{/* Floating Action Button */}
-			<TouchableOpacity
-				className='absolute items-center justify-center w-16 h-16 bg-blue-600 rounded-full shadow-lg bottom-8 right-6'
-				onPress={handleSend}
-			>
-				<Ionicons name='add' size={36} color='white' />
-			</TouchableOpacity>
 		</SafeAreaView>
 	);
 }
