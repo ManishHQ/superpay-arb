@@ -1,5 +1,5 @@
 import { Redirect, Tabs, useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
 	Platform,
 	StatusBar,
@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import { useReactiveClient } from '@dynamic-labs/react-hooks';
 import { dynamicClient } from '@/lib/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const styles = StyleSheet.create({
 	paymentButton: {
@@ -60,11 +61,47 @@ export const PaymentTabButton = () => {
 
 export default function TabLayout() {
 	const { auth, sdk, wallets } = useReactiveClient(dynamicClient);
+	const [isAuthenticated, setIsAuthenticated] = useState(false);
+	const [authChecked, setAuthChecked] = useState(false);
 
-	if (!sdk.loaded) {
+	// Check authentication status
+	useEffect(() => {
+		const checkAuthStatus = async () => {
+			try {
+				// Simple check: must have auth token AND connected wallets
+				const isLoggedIn = !!(auth.token && wallets.userWallets && wallets.userWallets.length > 0);
+				
+				console.log('Tab layout auth check (simplified):');
+				console.log('- auth.token:', !!auth.token);
+				console.log('- wallets count:', wallets.userWallets?.length || 0);
+				console.log('- final authenticated:', isLoggedIn);
+				
+				setIsAuthenticated(isLoggedIn);
+			} catch (error) {
+				console.error('Error checking auth status in tabs:', error);
+				setIsAuthenticated(false);
+			} finally {
+				setAuthChecked(true);
+			}
+		};
+
+		if (sdk.loaded) {
+			checkAuthStatus();
+		}
+	}, [auth.token, wallets.userWallets, sdk.loaded]);
+
+	// Show loading while checking auth
+	if (!sdk.loaded || !authChecked) {
 		return <Text>Loading...</Text>;
 	}
 
+	// Redirect to login if not authenticated
+	if (!isAuthenticated) {
+		console.log('User not authenticated in tabs, redirecting to login');
+		return <Redirect href='/login' />;
+	}
+
+	console.log('User authenticated in tabs, showing protected content');
 	console.log(wallets.userWallets);
 
 	return (

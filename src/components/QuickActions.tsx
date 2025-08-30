@@ -26,11 +26,11 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
 		<View className={`mb-6 ${className}`}>
 			<Text className='mb-3 text-xl font-semibold text-gray-900'>{title}</Text>
 
-			<View className='flex-row justify-between space-x-4 bg-white rounded-2xl'>
+			<View className='flex-row justify-between space-x-4 bg-white web:bg-transparent rounded-2xl'>
 				{actions.map((action) => (
 					<TouchableOpacity
 						key={action.id}
-						className='items-center flex-1 py-6 shadow-sm rounded-2xl'
+						className='items-center flex-1 py-6 shadow-sm web:bg-white mobile:bg-transparent rounded-2xl'
 						onPress={action.onPress}
 					>
 						<View

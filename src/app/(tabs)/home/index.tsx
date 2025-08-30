@@ -1,18 +1,18 @@
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useReactiveClient } from '@dynamic-labs/react-hooks';
 import {
 	WalletCard,
 	QuickStats,
 	QuickActions,
 	RecentActivity,
-	XPProgress,
 	HomeHeader,
 } from '@/components';
-import { dynamicClient, publicClient } from '@/lib/client';
+import { dynamicClient } from '@/lib/client';
 import { Wallet } from '@dynamic-labs/client';
+import { useWalletStore } from '@/stores/walletStore';
 
 // Default data fallbacks
 const defaultUser = {
@@ -20,11 +20,6 @@ const defaultUser = {
 	lastName: 'User',
 };
 
-const defaultBalances = {
-	usdcBalance: '0.00',
-	ethBalance: '0.0000',
-	walletAddress: 'Not connected',
-};
 
 // Dynamic wallet configurations
 const walletConfigs = [
@@ -117,21 +112,38 @@ const quickActions = [
 ];
 
 export default function HomeScreen() {
-	const { auth, sdk, wallets } = useReactiveClient(dynamicClient);
+	const { auth, wallets } = useReactiveClient(dynamicClient);
 	const [isLoading, setIsLoading] = useState(false);
-	const [currentTime, setCurrentTime] = useState(new Date());
 	const [greeting, setGreeting] = useState('');
 	const [currentWalletConfig, setCurrentWalletConfig] = useState(
 		walletConfigs[0]
 	);
 	const [dynamicStats, setDynamicStats] = useState(mockWeeklyStats);
 	const [userData, setUserData] = useState(defaultUser);
-	const [walletData, setWalletData] = useState(defaultBalances);
 	const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
-	const [isWalletLoading, setIsWalletLoading] = useState(false);
 
-	// Check if wallet is actually connected
-	const isWalletConnected = auth.token && wallets.userWallets.length > 0;
+	// Use Zustand store for wallet state
+	const {
+		isConnected: isWalletConnected,
+		isLoading: isWalletLoading,
+		balances,
+		address: walletAddress,
+		shortAddress,
+		error: walletError,
+		fetchBalances,
+		setConnected,
+		reset: resetWallet,
+	} = useWalletStore();
+
+	// Create wallet data object for compatibility with existing components
+	const walletData = useMemo(() => ({
+		usdcBalance: balances.usdc,
+		ethBalance: balances.eth,
+		walletAddress: shortAddress || 'Not connected',
+	}), [balances.usdc, balances.eth, shortAddress]);
+
+	// Check if wallet should be connected based on Dynamic state
+	const shouldBeConnected = auth.token && wallets.userWallets.length > 0;
 
 	console.log('isWalletConnected', isWalletConnected);
 	console.log('wallets.userWallets', wallets.userWallets);
@@ -156,74 +168,39 @@ export default function HomeScreen() {
 		return () => clearInterval(interval);
 	}, []);
 
-	// Fetch real wallet data from Dynamic
+	// Sync wallet connection state with Dynamic
 	useEffect(() => {
-		const fetchWalletData = async () => {
-			try {
-				if (isWalletConnected) {
-					setIsWalletLoading(true);
-					const wallet = wallets.userWallets[0];
-					setConnectedWallet(wallet);
-					console.log('Connected wallet:', wallet);
-
-					// Get wallet address
-					const address = wallet.address;
-
-					// Try to get balances using Viem extension
-					if (publicClient) {
-						try {
-							// Get ETH balance
-							const ethBalance = await publicClient.getBalance({
-								address: address as `0x${string}`,
-							});
-							console.log('ETH balance:', ethBalance);
-							const ethBalanceFormatted = (Number(ethBalance) / 1e18).toFixed(
-								4
-							);
-
-							// For USDC, you'd typically check a specific token contract
-							// This is a simplified example
-							const usdcBalance = '0.00'; // You can implement USDC balance checking here
-
-							setWalletData({
-								usdcBalance,
-								ethBalance: ethBalanceFormatted,
-								walletAddress: `${address.slice(0, 6)}...${address.slice(-4)}`,
-							});
-						} catch (error) {
-							console.error('Error fetching wallet balances:', error);
-							setWalletData({
-								...defaultBalances,
-								walletAddress: `${address.slice(0, 6)}...${address.slice(-4)}`,
-							});
-						}
-					}
-				} else {
-					setWalletData(defaultBalances);
-					setConnectedWallet(null);
-				}
-			} catch (error) {
-				console.error('Error in fetchWalletData:', error);
-				setWalletData(defaultBalances);
-			} finally {
-				setIsWalletLoading(false);
+		if (shouldBeConnected && wallets.userWallets.length > 0) {
+			const wallet = wallets.userWallets[0];
+			const address = wallet?.address;
+			
+			if (address) {
+				setConnectedWallet(wallet);
+				setConnected(true);
+				
+				// Fetch balances using the store
+				fetchBalances(address);
+				console.log('Wallet connected, fetching balances for:', address);
 			}
-		};
-
-		fetchWalletData();
-
-		// Refresh wallet data every 30 seconds when connected
-		let walletInterval: NodeJS.Timeout | null = null;
-		if (isWalletConnected) {
-			walletInterval = setInterval(fetchWalletData, 30000);
+		} else {
+			// Reset wallet state when not connected
+			setConnectedWallet(null);
+			resetWallet();
+			console.log('Wallet disconnected, resetting state');
 		}
+	}, [shouldBeConnected, wallets.userWallets, fetchBalances, setConnected, resetWallet]);
 
-		return () => {
-			if (walletInterval) {
-				clearInterval(walletInterval);
-			}
-		};
-	}, [isWalletConnected, wallets.userWallets, publicClient]);
+	// Auto-refresh balances every 2 minutes when connected
+	useEffect(() => {
+		if (!isWalletConnected || !walletAddress) return;
+
+		const interval = setInterval(() => {
+			console.log('Auto-refreshing balances...');
+			fetchBalances(walletAddress); // Normal fetch, respects debouncing
+		}, 120000); // 2 minutes
+
+		return () => clearInterval(interval);
+	}, [isWalletConnected, walletAddress, fetchBalances]);
 
 	// Update user data from Dynamic auth
 	useEffect(() => {
@@ -277,23 +254,14 @@ export default function HomeScreen() {
 	};
 
 	const handleRefresh = async () => {
-		console.log('Refresh button pressed - refreshing wallet data');
+		console.log('Refresh button pressed - force refreshing wallet data');
 		setIsLoading(true);
 
 		try {
-			// Trigger wallet data refresh
-			if (connectedWallet && publicClient) {
-				const ethBalance = await publicClient.getBalance({
-					address: connectedWallet.address as `0x${string}`,
-				});
-				const ethBalanceFormatted = (Number(ethBalance) / 1e18).toFixed(4);
-
-				setWalletData((prev) => ({
-					...prev,
-					ethBalance: ethBalanceFormatted,
-				}));
-
-				console.log('Balance refreshed:', ethBalanceFormatted);
+			// Force refresh balances even if recently fetched
+			if (connectedWallet && walletAddress) {
+				await fetchBalances(walletAddress, true); // Force refresh
+				console.log('Balances force refreshed via store');
 			}
 		} catch (error) {
 			console.error('Error refreshing balance:', error);
@@ -306,6 +274,16 @@ export default function HomeScreen() {
 		console.log('View all activity pressed - move logic to services');
 	};
 
+	const handleConnectWallet = () => {
+		console.log('Opening Dynamic wallet connection...');
+		try {
+			// This will open the Dynamic wallet connection modal
+			dynamicClient.ui.auth.show();
+		} catch (error) {
+			console.error('Error opening wallet connection modal:', error);
+		}
+	};
+
 	const cycleWalletConfig = () => {
 		const currentIndex = walletConfigs.findIndex(
 			(config) => config.id === currentWalletConfig.id
@@ -313,18 +291,6 @@ export default function HomeScreen() {
 		const nextIndex = (currentIndex + 1) % walletConfigs.length;
 		setCurrentWalletConfig(walletConfigs[nextIndex]);
 		console.log('Switched to wallet config:', walletConfigs[nextIndex].name);
-	};
-
-	const handleConnectWallet = () => {
-		console.log('Opening Dynamic wallet connection...');
-		// This will open the Dynamic wallet connection modal
-		dynamicClient.ui.auth.show();
-	};
-
-	const handleDisconnect = () => {
-		console.log('Disconnecting wallet...');
-		// This will disconnect the current wallet
-		dynamicClient.auth.logout();
 	};
 
 	return (
@@ -342,7 +308,7 @@ export default function HomeScreen() {
 				/>
 
 				{/* Connection Status */}
-				{!isWalletConnected && (
+				{!shouldBeConnected && (
 					<View className='p-4 mb-4 border border-yellow-200 bg-yellow-50 rounded-xl'>
 						<View className='flex-row items-center justify-between'>
 							<View className='flex-1'>
@@ -368,15 +334,17 @@ export default function HomeScreen() {
 
 				{/* Balance Card */}
 				<View className='mb-6'>
-					<WalletCard
-						usdcBalance={walletData.usdcBalance}
-						ethBalance={walletData.ethBalance}
-						walletAddress={walletData.walletAddress}
-						onSendPress={handleSend}
-						gradientColors={currentWalletConfig.gradientColors}
-						showEthBalance={currentWalletConfig.showEthBalance}
-						showWalletAddress={currentWalletConfig.showWalletAddress}
-					/>
+					<TouchableOpacity onPress={cycleWalletConfig} activeOpacity={0.8}>
+						<WalletCard
+							usdcBalance={walletData.usdcBalance}
+							ethBalance={walletData.ethBalance}
+							walletAddress={walletData.walletAddress}
+							onSendPress={handleSend}
+							gradientColors={currentWalletConfig.gradientColors}
+							showEthBalance={currentWalletConfig.showEthBalance}
+							showWalletAddress={currentWalletConfig.showWalletAddress}
+						/>
+					</TouchableOpacity>
 				</View>
 
 				{/* Quick Stats */}
@@ -395,7 +363,7 @@ export default function HomeScreen() {
 				<RecentActivity
 					activities={mockRecentActivity}
 					onViewAll={handleViewAllActivity}
-					className='mb-28'
+					className='mb-32 web:mb-8'
 				/>
 			</ScrollView>
 		</SafeAreaView>

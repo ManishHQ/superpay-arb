@@ -13,7 +13,25 @@ export default function LoginPage() {
 	const [phone, setPhone] = useState('');
 	const [otpToken, setOtpToken] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
-	const { auth } = useReactiveClient(dynamicClient);
+	const { auth, sdk } = useReactiveClient(dynamicClient);
+
+	// All hooks must be called before any conditional returns
+	useEffect(() => {
+		if (auth.token && sdk.loaded) {
+			router.replace('/(tabs)/home');
+		}
+	}, [auth.token, sdk.loaded]);
+
+	// Conditional rendering after all hooks
+	if (!sdk.loaded) {
+		return (
+			<View className='justify-center flex-1 p-5 bg-gray-50'>
+				<Text className='mb-10 text-3xl font-bold text-center text-gray-800'>
+					Loading...
+				</Text>
+			</View>
+		);
+	}
 
 	const storeAuthToken = async (token: string) => {
 		try {

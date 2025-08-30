@@ -16,7 +16,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
 	className = '',
 }) => {
 	return (
-		<View className={`mb-6 ${className}`}>
+		<View className={`web:mt-6 mb-6 ${className}`}>
 			<View className='flex-row items-center justify-between mb-2'>
 				<View>
 					<Text className='text-2xl font-bold text-gray-900'>

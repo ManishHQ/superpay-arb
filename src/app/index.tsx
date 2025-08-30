@@ -9,13 +9,22 @@ export default function Home() {
 	const [isReady, setIsReady] = useState(false);
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const [authChecked, setAuthChecked] = useState(false);
-	const { auth } = useReactiveClient(dynamicClient);
+	const { auth, wallets } = useReactiveClient(dynamicClient);
 
 	useEffect(() => {
 		const checkAuthStatus = async () => {
 			try {
-				const storedToken = await AsyncStorage.getItem('authToken');
-				const isLoggedIn = !!(auth.token || storedToken);
+				// Clear any stored tokens to start fresh
+				await AsyncStorage.removeItem('authToken');
+				
+				// Simple check: must have auth token AND connected wallets
+				const isLoggedIn = !!(auth.token && wallets.userWallets && wallets.userWallets.length > 0);
+				
+				console.log('Root index auth check (simplified):');
+				console.log('- auth.token:', !!auth.token);
+				console.log('- wallets count:', wallets.userWallets?.length || 0);
+				console.log('- final authenticated:', isLoggedIn);
+				
 				setIsAuthenticated(isLoggedIn);
 			} catch (error) {
 				console.error('Error checking auth status:', error);
@@ -26,7 +35,7 @@ export default function Home() {
 		};
 
 		checkAuthStatus();
-	}, [auth.token]);
+	}, [auth.token, wallets.userWallets]);
 
 	useEffect(() => {
 		if (authChecked) {
