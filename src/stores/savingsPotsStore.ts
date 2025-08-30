@@ -11,9 +11,8 @@ import {
 	CreatePotData,
 	UpdatePotData,
 } from '@/services/potsService';
-import { useUserProfileStore } from '@/stores/userProfileStore';
-import { useWalletStore } from '@/stores/walletStore';
 import { TransactionService } from '@/services/transactionService';
+import { useWalletStore } from '@/stores/walletStore';
 
 export interface SavingsPot {
 	id: string;
@@ -286,11 +285,7 @@ export const useSavingsPotsStore = create<SavingsPotsState>()(
 				}
 
 				// Update pot in database
-				const updatedPot = await PotsService.updatePot(
-					id,
-					userId,
-					updates
-				);
+				const updatedPot = await PotsService.updatePot(id, userId, updates);
 
 				// Update local state
 				set((state) => ({
@@ -371,11 +366,7 @@ export const useSavingsPotsStore = create<SavingsPotsState>()(
 				}
 
 				// Add funds to pot in database
-				const updatedPot = await PotsService.addFunds(
-					potId,
-					userId,
-					amount
-				);
+				const updatedPot = await PotsService.addFunds(potId, userId, amount);
 
 				// Update local state
 				set((state) => ({
@@ -730,18 +721,20 @@ export const useSavingsPotsStore = create<SavingsPotsState>()(
 			try {
 				const userId = await get().getCurrentUserId();
 				if (!userId) {
-					console.log('[SavingsPotsStore] User not authenticated, skipping pot loading');
+					console.log(
+						'[SavingsPotsStore] User not authenticated, skipping pot loading'
+					);
 					set({ isLoading: false });
 					return;
 				}
 
-				// Fetch pots from database
-				const pots = await PotsService.getUserPots(userId);
+				// Fetch pots from database only
+				const databasePots = await PotsService.getUserPots(userId);
 
-				set({ pots, isLoading: false });
+				set({ pots: databasePots, isLoading: false });
 				console.log(
 					'[SavingsPotsStore] Loaded pots from database:',
-					pots.length
+					databasePots.length
 				);
 			} catch (error) {
 				console.error('[SavingsPotsStore] Error loading pots:', error);
@@ -760,7 +753,8 @@ export const useSavingsPotsStore = create<SavingsPotsState>()(
 
 			try {
 				// Get user profile by wallet address
-				const userProfile = await TransactionService.getUserProfileByWalletAddress(walletAddress);
+				const userProfile =
+					await TransactionService.getUserProfileByWalletAddress(walletAddress);
 				return userProfile?.id || null;
 			} catch (error) {
 				console.error('[SavingsPotsStore] Error getting user ID:', error);

@@ -4,6 +4,18 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import '../global.css';
 
+import { LogBox } from 'react-native';
+
+LogBox.ignoreAllLogs();
+
+if (!__DEV__) {
+	(console as any) = {
+		log: () => {},
+		warn: () => {},
+		error: () => {},
+	};
+}
+
 export default function AppLayout() {
 	return (
 		<>

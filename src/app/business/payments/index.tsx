@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import QRCode from 'react-native-qrcode-svg';
 import { useUserProfileStore } from '@/stores/userProfileStore';
+import { TransactionService } from '@/services/transactionService';
 // Removed payment requests imports for security
 
 const styles = StyleSheet.create({
@@ -323,7 +324,144 @@ export default function PaymentRequestsPage() {
 
 	const [isScanning, setIsScanning] = useState(true);
 
+	// Payment verification states
+	const [isMonitoringPayment, setIsMonitoringPayment] = useState(false);
+	const [lastTransactionId, setLastTransactionId] = useState<string | null>(
+		null
+	);
+	const [paymentReceived, setPaymentReceived] = useState(false);
+	const [receivedPayment, setReceivedPayment] = useState<any>(null);
+	const [monitoringStartTime, setMonitoringStartTime] = useState<number>(0);
+
 	const { currentProfile } = useUserProfileStore();
+
+	// Payment monitoring function
+	const startPaymentMonitoring = async () => {
+		if (!currentProfile?.id) {
+			console.log('❌ No current profile for payment monitoring');
+			return;
+		}
+
+		console.log('🔍 Starting payment monitoring...');
+		const startTime = Date.now();
+		setIsMonitoringPayment(true);
+		setPaymentReceived(false);
+		setReceivedPayment(null);
+		setMonitoringStartTime(startTime);
+
+		// Get the latest transaction ID to use as baseline
+		try {
+			const recentTransactions =
+				await TransactionService.getTransactionsByUserId(currentProfile.id, 1);
+			if (recentTransactions.length > 0) {
+				setLastTransactionId(recentTransactions[0].id);
+				console.log(
+					'📋 Baseline transaction ID set:',
+					recentTransactions[0].id
+				);
+			}
+		} catch (error) {
+			console.error('❌ Error getting baseline transaction:', error);
+		}
+
+		// Start polling for new transactions
+		const pollInterval = setInterval(async () => {
+			try {
+				console.log('🔄 Checking for new payments...');
+				const recentTransactions =
+					await TransactionService.getTransactionsByUserId(
+						currentProfile.id,
+						5
+					);
+
+				// Check for new transactions (received payments)
+				const newPayments = recentTransactions.filter((tx) => {
+					const isReceived = tx.to_user_id === currentProfile.id;
+					const isRecent =
+						new Date(tx.created_at).getTime() > Date.now() - 300000; // Within last 5 minutes
+					const isCompleted = tx.status === 'completed';
+					const isUSDC = tx.currency === 'USDC';
+
+					// For new payment detection, check if transaction was created after monitoring started
+					const isNewTransaction =
+						new Date(tx.created_at).getTime() > monitoringStartTime;
+
+					console.log('🔍 Transaction check:', {
+						txId: tx.id,
+						isReceived,
+						isRecent,
+						isCompleted,
+						isUSDC,
+						isNewTransaction,
+						toUserId: tx.to_user_id,
+						currentUserId: currentProfile.id,
+						createdAt: tx.created_at,
+						timeDiff: Date.now() - new Date(tx.created_at).getTime(),
+						status: tx.status,
+						currency: tx.currency,
+						amount: tx.amount,
+						txCreatedAt: new Date(tx.created_at).getTime(),
+					});
+
+					return (
+						isReceived && isRecent && isCompleted && isUSDC && isNewTransaction
+					);
+				});
+
+				if (newPayments.length > 0) {
+					console.log('✅ New payment detected!', newPayments[0]);
+					const payment = newPayments[0];
+
+					setPaymentReceived(true);
+					setReceivedPayment(payment);
+					setIsMonitoringPayment(false);
+
+					// Clear the interval
+					clearInterval(pollInterval);
+
+					// Show success alert
+					Alert.alert(
+						'Payment Received! 🎉',
+						`You received $${payment.amount} from ${
+							payment.from_user?.display_name ||
+							payment.from_user?.username ||
+							'Unknown'
+						}`,
+						[
+							{
+								text: 'View Details',
+								onPress: () => {
+									// Could navigate to transaction details
+									console.log('View payment details:', payment);
+								},
+							},
+							{
+								text: 'OK',
+								style: 'default',
+							},
+						]
+					);
+				}
+			} catch (error) {
+				console.error('❌ Error checking for payments:', error);
+			}
+		}, 3000); // Poll every 3 seconds
+
+		// Auto-stop monitoring after 5 minutes
+		setTimeout(() => {
+			console.log('⏰ Payment monitoring timeout');
+			clearInterval(pollInterval);
+			setIsMonitoringPayment(false);
+		}, 300000); // 5 minutes
+	};
+
+	const stopPaymentMonitoring = () => {
+		console.log('🛑 Stopping payment monitoring');
+		setIsMonitoringPayment(false);
+		setPaymentReceived(false);
+		setReceivedPayment(null);
+		setMonitoringStartTime(0);
+	};
 
 	// Helper function to close payment modal and reset scanning
 	const closePaymentModal = () => {
@@ -352,7 +490,7 @@ export default function PaymentRequestsPage() {
 		const paymentRequest = {
 			type: 'payment_request',
 			amount: 0, // Default amount (user can specify)
-			currency: 'USD',
+			currency: 'USDC',
 			description: `Payment to ${businessName}`,
 			recipient: userWallet,
 			recipientName: businessName,
@@ -363,6 +501,9 @@ export default function PaymentRequestsPage() {
 
 		setQrData(JSON.stringify(paymentRequest));
 		console.log('✅ [Payment] Default QR code generated');
+
+		// Start monitoring for payments when QR is generated
+		startPaymentMonitoring();
 	};
 
 	// Generate payment request QR code
@@ -387,7 +528,7 @@ export default function PaymentRequestsPage() {
 		const paymentRequest = {
 			type: 'payment_request',
 			amount: parseFloat(requestAmount),
-			currency: 'USD',
+			currency: 'USDC',
 			description: requestNote.trim() || `Payment request from ${businessName}`,
 			recipient: userWallet,
 			recipientName: businessName,
@@ -399,11 +540,14 @@ export default function PaymentRequestsPage() {
 		setQrData(JSON.stringify(paymentRequest));
 		setShowRequestModal(false);
 
+		// Start monitoring for payments when QR is generated
+		startPaymentMonitoring();
+
 		Alert.alert(
 			'Payment Request QR Generated',
 			`Generated QR code requesting $${requestAmount} ${
 				requestNote ? `for "${requestNote}"` : ''
-			}`
+			}. Monitoring for payments...`
 		);
 	};
 
@@ -412,7 +556,19 @@ export default function PaymentRequestsPage() {
 		if (mode === 'receive' && currentProfile && !qrData) {
 			generateDefaultQR();
 		}
+
+		// Stop monitoring when switching away from receive mode
+		if (mode !== 'receive') {
+			stopPaymentMonitoring();
+		}
 	}, [mode, currentProfile]);
+
+	// Cleanup monitoring on unmount
+	useEffect(() => {
+		return () => {
+			stopPaymentMonitoring();
+		};
+	}, []);
 
 	const handleQRCodeScanned = async (result: any) => {
 		// Prevent multiple scans
@@ -657,8 +813,104 @@ export default function PaymentRequestsPage() {
 							)}
 						</View>
 
+						{/* Payment Status */}
+						{(isMonitoringPayment || paymentReceived) && (
+							<View
+								style={[
+									styles.qrInfo,
+									{ backgroundColor: paymentReceived ? '#dcfce7' : '#dbeafe' },
+								]}
+							>
+								{paymentReceived && receivedPayment ? (
+									<>
+										<View
+											style={{
+												flexDirection: 'row',
+												alignItems: 'center',
+												marginBottom: 8,
+											}}
+										>
+											<Ionicons
+												name='checkmark-circle'
+												size={24}
+												color='#16a34a'
+											/>
+											<Text
+												style={[
+													styles.qrInfoTitle,
+													{ color: '#16a34a', marginLeft: 8 },
+												]}
+											>
+												Payment Received! 🎉
+											</Text>
+										</View>
+										<Text style={[styles.qrInfoAmount, { color: '#16a34a' }]}>
+											${receivedPayment.amount}
+										</Text>
+										<Text style={styles.qrInfoDescription}>
+											From:{' '}
+											{receivedPayment.from_user?.display_name ||
+												receivedPayment.from_user?.username ||
+												'Unknown'}
+										</Text>
+										<Text
+											style={[
+												styles.qrInfoDescription,
+												{ fontSize: 12, color: '#6b7280' },
+											]}
+										>
+											{new Date(receivedPayment.created_at).toLocaleString()}
+										</Text>
+									</>
+								) : (
+									<>
+										<View
+											style={{
+												flexDirection: 'row',
+												alignItems: 'center',
+												marginBottom: 8,
+											}}
+										>
+											<ActivityIndicator size='small' color='#3b82f6' />
+											<Text
+												style={[
+													styles.qrInfoTitle,
+													{ color: '#3b82f6', marginLeft: 8 },
+												]}
+											>
+												Monitoring for Payments
+											</Text>
+										</View>
+										<Text style={styles.qrInfoDescription}>
+											Waiting for someone to scan and pay...
+										</Text>
+										<TouchableOpacity
+											style={{
+												backgroundColor: '#ef4444',
+												paddingHorizontal: 16,
+												paddingVertical: 8,
+												borderRadius: 8,
+												marginTop: 12,
+											}}
+											onPress={stopPaymentMonitoring}
+										>
+											<Text
+												style={{
+													color: 'white',
+													fontWeight: '600',
+													fontSize: 14,
+												}}
+											>
+												Stop Monitoring
+											</Text>
+										</TouchableOpacity>
+									</>
+								)}
+							</View>
+						)}
+
 						{/* QR Info */}
-						{qrData && (
+						{qrData && !paymentReceived && !isMonitoringPayment && (
 							<View style={styles.qrInfo}>
 								{(() => {
 									try {
@@ -711,6 +963,19 @@ export default function PaymentRequestsPage() {
 								<Ionicons name='receipt' size={20} color='white' />
 								<Text style={styles.qrActionText}>Request Amount</Text>
 							</TouchableOpacity>
+
+							{!isMonitoringPayment && !paymentReceived && (
+								<TouchableOpacity
+									style={[
+										styles.qrActionButton,
+										{ backgroundColor: '#16a34a' },
+									]}
+									onPress={startPaymentMonitoring}
+								>
+									<Ionicons name='eye' size={20} color='white' />
+									<Text style={styles.qrActionText}>Monitor Payments</Text>
+								</TouchableOpacity>
+							)}
 
 							<TouchableOpacity
 								style={[styles.qrActionButton, styles.qrActionButtonSecondary]}
@@ -777,7 +1042,7 @@ export default function PaymentRequestsPage() {
 							)}
 
 							<View style={styles.inputGroup}>
-								<Text style={styles.inputLabel}>Amount (USD)</Text>
+								<Text style={styles.inputLabel}>Amount (USDC)</Text>
 								<View style={styles.inputContainer}>
 									<Text style={styles.currencySymbol}>$</Text>
 									<TextInput
@@ -891,7 +1156,7 @@ export default function PaymentRequestsPage() {
 							</View>
 
 							<View style={styles.inputGroup}>
-								<Text style={styles.inputLabel}>Request Amount (USD)</Text>
+								<Text style={styles.inputLabel}>Request Amount (USDC)</Text>
 								<View style={styles.inputContainer}>
 									<Text style={styles.currencySymbol}>$</Text>
 									<TextInput

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -13,10 +13,15 @@ import {
 	AppState,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import QRCode from 'react-native-qrcode-svg';
 import { useUserProfileStore } from '@/stores/userProfileStore';
+import { useWalletStore } from '@/stores/walletStore';
+import { useBalanceStore } from '@/stores/balanceStore';
+import { TransactionService } from '@/services/transactionService';
+import { WalletService } from '@/services/walletService';
 
 export default function PaymentScreen() {
 	const [mode, setMode] = useState<'scan' | 'qr'>('scan');
@@ -32,125 +37,81 @@ export default function PaymentScreen() {
 	const [qrData, setQrData] = useState<string>('');
 	const [showRequestModal, setShowRequestModal] = useState(false);
 	const [isScanning, setIsScanning] = useState(true);
-	const [isMounted, setIsMounted] = useState(true);
-	const [cameraKey, setCameraKey] = useState(0);
-	const [isCameraActive, setIsCameraActive] = useState(false);
-	const [isScreenFocused, setIsScreenFocused] = useState(true);
+	const [isCameraReady, setIsCameraReady] = useState(false); // Camera readiness state
+	const [showTransactionCompleteModal, setShowTransactionCompleteModal] =
+		useState(false);
+	const [transactionHash, setTransactionHash] = useState<string | null>(null);
+	const [completedTransaction, setCompletedTransaction] = useState<any>(null);
 
 	const { currentProfile } = useUserProfileStore();
+	const { address: walletAddress } = useWalletStore();
+	const { fetchBalances, invalidateBalance, getBalance } = useBalanceStore();
 
-	// Cleanup on unmount
+	// Handle camera lifecycle when switching modes
 	useEffect(() => {
-		return () => {
-			setIsMounted(false);
-			setIsCameraActive(false);
-		};
-	}, []);
+		if (mode === 'qr') {
+			// Stop camera immediately when switching to QR mode
+			console.log('📷 Stopping camera - switching to QR mode');
+			setIsScanning(false);
+			setScanResult(null);
+			setIsCameraReady(false); // Reset camera readiness
+		} else if (mode === 'scan') {
+			// When switching to scan mode, ensure clean state
+			console.log('📷 Preparing scan mode');
+			setScanResult(null);
+			setIsCameraReady(false); // Reset camera readiness when switching to scan
+			// Don't start scanning immediately - let button handler control this
+		}
+	}, [mode]);
 
-	// Handle screen focus - kill camera when screen loses focus
+	// Handle camera ready event
+	const handleCameraReady = () => {
+		console.log('📷 Camera is ready');
+		setIsCameraReady(true);
+	};
+
+	// Handle screen focus - stop camera when screen is not focused
 	useFocusEffect(
 		React.useCallback(() => {
-			console.log('🎯 Payment screen focused');
-			setIsScreenFocused(true);
-
-			// Reset camera when screen is focused
-			if (mode === 'scan') {
-				resetCameraInstance();
-			}
-
+			console.log('📱 Screen focused');
+			// Don't auto-start camera, let user control it with buttons
 			return () => {
-				console.log('🎯 Payment screen unfocused - killing camera');
-				setIsScreenFocused(false);
-				setIsCameraActive(false);
+				console.log('📱 Screen unfocused - stopping camera');
 				setIsScanning(false);
+				setIsCameraReady(false); // Reset camera readiness when unfocused
 			};
-		}, [mode])
+		}, [])
 	);
 
-	// Handle app state changes - pause camera when app goes to background
+	// Handle app state changes - stop camera when app goes to background
 	useEffect(() => {
 		const handleAppStateChange = (nextAppState: string) => {
-			console.log('📱 App state changed:', nextAppState);
-
 			if (nextAppState === 'background' || nextAppState === 'inactive') {
-				console.log('📱 App backgrounded - pausing camera');
-				setIsCameraActive(false);
+				console.log('📱 App backgrounded - stopping camera');
 				setIsScanning(false);
-			} else if (
-				nextAppState === 'active' &&
-				isScreenFocused &&
-				mode === 'scan'
-			) {
-				console.log('📱 App foregrounded - resuming camera');
-				resetCameraInstance();
+				setIsCameraReady(false); // Reset camera readiness when backgrounded
 			}
 		};
 
-		const subscription = AppState.addEventListener(
-			'change',
-			handleAppStateChange
-		);
+		const subscription = AppState.addEventListener('change', handleAppStateChange);
 		return () => subscription?.remove();
-	}, [isScreenFocused, mode]);
+	}, []);
 
 	// Helper function to close payment modal and reset scanning
 	const closePaymentModal = () => {
-		if (!isMounted) return;
-
 		setShowPaymentModal(false);
 		setPaymentData(null);
 		setAmount('');
 		setNote('');
 		setScanResult(null);
-		setIsScanning(true);
+		setIsScanning(true); // Re-enable scanning
 	};
 
-	// Helper function to reset camera instance
-	const resetCameraInstance = () => {
-		if (!isMounted || !isScreenFocused) return;
-
-		console.log('📸 Resetting camera instance');
-
-		// Kill current camera
-		setIsCameraActive(false);
-		setIsScanning(false);
-
-		// Generate new camera key to force re-render
-		setCameraKey((prev) => prev + 1);
-
-		// Delay activation to ensure clean reset
-		setTimeout(() => {
-			if (isMounted && isScreenFocused && mode === 'scan') {
-				console.log('📸 Activating fresh camera instance');
-				setIsCameraActive(true);
-				setIsScanning(true);
-			}
-		}, 200);
-	};
-
-	// Helper function to safely reset scan state
-	const resetScanState = () => {
-		if (!isMounted) return;
-
-		console.log('🔄 Resetting scan state');
-		setScanResult(null);
-		setPaymentData(null);
-		setAmount('');
-		setNote('');
-		setShowPaymentModal(false);
-
-		// Reset camera if in scan mode
-		if (mode === 'scan' && isScreenFocused) {
-			resetCameraInstance();
-		}
-	};
 
 	// Generate default QR code (for receiving payments)
 	const generateDefaultQR = () => {
-		if (!currentProfile || !isMounted) {
-			console.log(
-				'🔍 [Payment] Waiting for user profile or component unmounted...'
-			);
+		if (!currentProfile) {
+			console.log('🔍 [Payment] Waiting for user profile...');
 			return;
 		}
 
@@ -161,7 +122,7 @@ export default function PaymentScreen() {
 		const paymentRequest = {
 			type: 'payment_request',
 			amount: 0, // Default amount (user can specify)
-			currency: 'USD',
+			currency: 'USDC',
 			description: `Payment to ${userName}`,
 			recipient: userWallet,
 			recipientName: userName,
@@ -176,8 +137,6 @@ export default function PaymentScreen() {
 
 	// Generate payment request QR code
 	const generateRequestQR = () => {
-		if (!isMounted) return;
-
 		if (!currentProfile) {
 			Alert.alert('Error', 'User profile not loaded');
 			return;
@@ -195,54 +154,32 @@ export default function PaymentScreen() {
 		const paymentRequest = {
 			type: 'payment_request',
 			amount: parseFloat(requestAmount),
-			currency: 'USD',
+			currency: 'USDC',
 			description: requestNote.trim() || `Payment request from ${userName}`,
 			recipient: userWallet,
 			recipientName: userName,
 			userId: currentProfile.id || '',
 			timestamp: Date.now(),
-			requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+			requestId: `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
 		};
 
-		if (isMounted) {
-			setQrData(JSON.stringify(paymentRequest));
-			setShowRequestModal(false);
+		setQrData(JSON.stringify(paymentRequest));
+		setShowRequestModal(false);
 
-			Alert.alert(
-				'Payment Request QR Generated',
-				`Generated QR code requesting $${requestAmount} ${
-					requestNote ? `for "${requestNote}"` : ''
-				}`
-			);
-		}
+		Alert.alert(
+			'Payment Request QR Generated',
+			`Generated QR code requesting $${requestAmount} ${
+				requestNote ? `for "${requestNote}"` : ''
+			}`
+		);
 	};
-
-	// Handle mode changes and camera activation
-	useEffect(() => {
-		if (!isMounted || !isScreenFocused) return;
-
-		if (mode === 'scan') {
-			console.log('📸 Mode is scan - activating camera');
-			// Delay camera activation slightly to ensure clean state
-			const timer = setTimeout(() => {
-				if (isMounted && isScreenFocused && mode === 'scan') {
-					resetCameraInstance();
-				}
-			}, 100);
-			return () => clearTimeout(timer);
-		} else {
-			console.log('📸 Mode is not scan - deactivating camera');
-			setIsCameraActive(false);
-			setIsScanning(false);
-		}
-	}, [mode, isMounted, isScreenFocused]);
 
 	// Load default QR when switching to QR mode
 	useEffect(() => {
-		if (isMounted && mode === 'qr' && currentProfile && !qrData) {
+		if (mode === 'qr' && currentProfile && !qrData) {
 			generateDefaultQR();
 		}
-	}, [mode, currentProfile, isMounted]);
+	}, [mode, currentProfile]);
 
 	if (!permission) {
 		return (
@@ -276,22 +213,14 @@ export default function PaymentScreen() {
 	}
 
 	const handleQRCodeScanned = async (result: any) => {
-		// Prevent multiple scans and check if component is still mounted
-		if (!isScanning || !isMounted || !isCameraActive || !result?.data) {
-			console.log('🔍 QR scan ignored - invalid state');
+		// Prevent multiple scans
+		if (!isScanning) {
 			return;
 		}
 
 		console.log('🔍 QR Code scanned:', result.data);
-
-		// Temporarily pause camera to prevent multiple scans
-		setIsCameraActive(false);
-
-		// Safely update state
-		if (isMounted) {
-			setIsScanning(false);
-			setScanResult(result.data);
-		}
+		setIsScanning(false); // Stop further scanning
+		setScanResult(result.data);
 
 		try {
 			// Try to parse as payment request
@@ -300,9 +229,18 @@ export default function PaymentScreen() {
 			if (paymentRequest && paymentRequest.type === 'payment_request') {
 				console.log('✅ Valid payment request found:', paymentRequest);
 
-				if (!isMounted) return; // Check again before updating state
+				// Enhance payment data with business information if available
+				const enhancedPaymentData = {
+					...paymentRequest,
+					businessName:
+						paymentRequest.businessName || paymentRequest.business_name,
+					recipientType:
+						paymentRequest.businessName || paymentRequest.business_name
+							? 'business'
+							: 'user',
+				};
 
-				setPaymentData(paymentRequest);
+				setPaymentData(enhancedPaymentData);
 
 				// Handle zero amount - let user enter amount
 				if (
@@ -317,19 +255,17 @@ export default function PaymentScreen() {
 				setNote(paymentRequest.description || '');
 				setShowPaymentModal(true);
 			} else {
-				if (isMounted) {
-					Alert.alert('QR Code Scanned', `Unsupported format: ${result.data}`);
-					// Re-enable scanning on error
-					resetScanState();
-				}
+				Alert.alert('QR Code Scanned', `Unsupported format: ${result.data}`);
+				// Re-enable scanning on error
+				setIsScanning(true);
+				setScanResult(null);
 			}
 		} catch (error) {
 			console.error('❌ QR parsing error:', error);
-			if (isMounted) {
-				Alert.alert('Invalid QR Code', 'Could not parse QR code data');
-				// Re-enable scanning on error
-				resetScanState();
-			}
+			Alert.alert('Invalid QR Code', 'Could not parse QR code data');
+			// Re-enable scanning on error
+			setIsScanning(true);
+			setScanResult(null);
 		}
 	};
 
@@ -339,23 +275,131 @@ export default function PaymentScreen() {
 			return;
 		}
 
+		if (!currentProfile || !walletAddress || !paymentData) {
+			Alert.alert('Error', 'Missing payment information');
+			return;
+		}
+
+		// Validate recipient address
+		if (!paymentData.recipient || !paymentData.recipient.startsWith('0x')) {
+			Alert.alert('Error', 'Invalid recipient wallet address');
+			return;
+		}
+
 		setIsProcessing(true);
 		try {
-			console.log('🚀 Processing payment...');
+			console.log('🚀 Processing USDC payment...');
+			console.log('💰 Amount:', amount, 'USDC');
+			console.log('📍 To:', paymentData.recipient);
+			console.log('👤 From:', walletAddress);
 
-			// Simulate payment processing
-			await new Promise((resolve) => setTimeout(resolve, 2000));
+			const walletService = new WalletService();
+			const numericAmount = parseFloat(amount);
 
-			Alert.alert(
-				'Payment Successful!',
-				`Successfully sent $${amount} to ${paymentData?.recipientName || 'recipient'}`
-			);
+			if (isNaN(numericAmount) || numericAmount <= 0) {
+				Alert.alert('Error', 'Please enter a valid amount');
+				return;
+			}
 
-			// Reset modal
-			closePaymentModal();
+			// Get current USDC balance using the balance store
+			const usdcBalance = walletAddress
+				? getBalance(walletAddress, 'usdc')
+				: null;
+			const currentBalance = parseFloat(usdcBalance?.formatted || '0');
+
+			if (numericAmount > currentBalance) {
+				Alert.alert(
+					'Insufficient Balance',
+					`You don't have enough USDC to complete this transaction. You have ${currentBalance} USDC but need ${numericAmount} USDC.`
+				);
+				return;
+			}
+
+			// Send USDC using the USDCService
+			const recipientAddress = paymentData.recipient as `0x${string}`;
+			const usdcService = walletService.getUSDCService();
+			const txResult = await usdcService.sendUSDC(recipientAddress, amount);
+
+			if (txResult.status === 'confirmed') {
+				console.log('🎉 USDC transfer confirmed!', txResult);
+
+				// Create transaction record in database
+				const transactionData = {
+					to_user_id: paymentData.userId,
+					amount: numericAmount,
+					currency: 'USDC' as const,
+					note: note.trim() || `Payment to ${paymentData.recipientName}`,
+					transaction_hash: txResult.hash,
+					block_number: txResult.blockNumber || 0,
+					blockchain: 'ethereum',
+					network: 'base-sepolia',
+					gas_fee: txResult.gasUsed
+						? Number(txResult.gasUsed) * 0.000000001
+						: undefined, // Convert wei to ETH
+					gas_fee_currency: 'ETH',
+					platform_fee: numericAmount * 0.001, // 0.1% platform fee
+					platform_fee_currency: 'USDC',
+					transaction_type: 'transfer' as const,
+					category: 'other' as const,
+					is_internal: false,
+				};
+
+				const transaction =
+					await TransactionService.createTransaction(transactionData);
+
+				// Store transaction details for the completion modal
+				setTransactionHash(txResult.hash);
+				setCompletedTransaction({
+					...transaction,
+					recipientName: paymentData.recipientName,
+					recipientType: paymentData.businessName ? 'business' : 'user',
+					businessName: paymentData.businessName,
+					blockNumber: txResult.blockNumber || 0,
+					gasUsed: txResult.gasUsed?.toString() || '0',
+					effectiveGasPrice: '0', // We don't have this info from USDCService
+				});
+
+				// Close payment modal and show completion modal
+				closePaymentModal();
+				setShowTransactionCompleteModal(true);
+
+				// Update wallet balance in background
+				if (walletAddress) {
+					invalidateBalance(walletAddress, 'usdc');
+					setTimeout(() => fetchBalances(walletAddress, true), 2000);
+				}
+
+				console.log('🎉 Payment completed successfully!');
+			} else {
+				Alert.alert(
+					'Transaction Failed',
+					'The transaction could not be completed. Please try again.'
+				);
+				console.log('Transaction failed');
+			}
 		} catch (error) {
 			console.error('❌ Error processing payment:', error);
-			Alert.alert('Error', 'Failed to process payment. Please try again.');
+
+			// Provide more specific error messages
+			let errorMessage = 'Failed to process payment. Please try again.';
+
+			if (error instanceof Error) {
+				if (error.message.includes('Insufficient')) {
+					errorMessage = error.message;
+				} else if (error.message.includes('User rejected')) {
+					errorMessage = 'Transaction was cancelled by user.';
+				} else if (error.message.includes('network')) {
+					errorMessage =
+						'Network error. Please check your connection and try again.';
+				} else if (error.message.includes('gas')) {
+					errorMessage =
+						'Transaction failed due to gas issues. Please try again.';
+				} else {
+					errorMessage = `Transaction failed: ${error.message}`;
+				}
+			}
+
+			Alert.alert('Payment Failed', errorMessage);
 		} finally {
 			setIsProcessing(false);
 		}
@@ -368,18 +412,16 @@ export default function PaymentScreen() {
 		>
 			<View className='flex-1 bg-white'>
 				{/* Tab-like toggle */}
-				<View className='flex-row w-full max-w-xs p-1 mx-auto bg-gray-100 rounded-full mt-16 mb-8'>
+				<View className='flex-row w-full max-w-xs p-1 mx-auto mt-16 mb-8 bg-gray-100 rounded-full'>
 					<TouchableOpacity
 						className={`flex-1 items-center py-3 rounded-full ${
 							mode === 'scan' ? 'bg-blue-600' : ''
 						}`}
 						onPress={() => {
-							if (isMounted && mode !== 'scan') {
-								console.log('🔄 Switching to scan mode');
-								setMode('scan');
-								setIsCameraActive(false); // Kill current camera first
-								resetScanState();
-							}
+							setMode('scan');
+							setScanResult(null);
+							// Small delay to ensure camera cleanup before starting
+							setTimeout(() => setIsScanning(true), 100);
 						}}
 					>
 						<Text
@@ -394,15 +436,7 @@ export default function PaymentScreen() {
 						className={`flex-1 items-center py-3 rounded-full ${
 							mode === 'qr' ? 'bg-blue-600' : ''
 						}`}
-						onPress={() => {
-							if (isMounted && mode !== 'qr') {
-								console.log('🔄 Switching to QR mode');
-								setIsCameraActive(false); // Kill camera when switching to QR mode
-								setIsScanning(false);
-								setMode('qr');
-								resetScanState();
-							}
-						}}
+						onPress={() => setMode('qr')}
 					>
 						<Text
 							className={`font-semibold ${
@@ -417,16 +451,15 @@ export default function PaymentScreen() {
 				{/* Main content */}
 				{mode === 'scan' ? (
 					<View className='relative flex-1'>
-						{/* Camera View for Scan Mode */}
-						{!scanResult && isCameraActive && (
+						{!scanResult && mode === 'scan' && permission?.granted && (
 							<CameraView
-								key={`camera-${cameraKey}`} // Force re-render with new key
 								barcodeScannerSettings={{
 									barcodeTypes: ['qr'],
 								}}
 								onBarcodeScanned={
-									isScanning && isCameraActive ? handleQRCodeScanned : undefined
+									isScanning && isCameraReady ? handleQRCodeScanned : undefined
 								}
+								onCameraReady={handleCameraReady}
 								style={{
 									position: 'absolute',
 									width: '100%',
@@ -440,13 +473,26 @@ export default function PaymentScreen() {
 							/>
 						)}
 
-						{/* Camera Loading State */}
-						{!scanResult && !isCameraActive && mode === 'scan' && (
-							<View className='absolute inset-0 items-center justify-center bg-black'>
-								<ActivityIndicator size='large' color='#ffffff' />
-								<Text className='mt-4 text-white'>Initializing Camera...</Text>
-							</View>
-						)}
+						{/* Permission Denied State */}
+						{!scanResult &&
+							mode === 'scan' &&
+							permission &&
+							!permission.granted && (
+								<View className='absolute inset-0 items-center justify-center bg-black'>
+									<Ionicons name='camera-outline' size={64} color='#ffffff' />
+									<Text className='px-8 mt-4 text-center text-white'>
+										Camera permission required to scan QR codes
+									</Text>
+									<TouchableOpacity
+										className='px-4 py-2 mt-4 bg-blue-600 rounded-lg'
+										onPress={requestPermission}
+									>
+										<Text className='font-semibold text-white'>
+											Grant Permission
+										</Text>
+									</TouchableOpacity>
+								</View>
+							)}
 
 						{scanResult && (
 							<View className='absolute inset-0 z-30 items-center justify-center bg-black bg-opacity-50'>
@@ -459,12 +505,20 @@ export default function PaymentScreen() {
 										className='px-6 py-3 mt-6 bg-blue-600 rounded-full'
 										onPress={() => {
 											setScanResult(null);
-											setIsScanning(true);
+											setIsScanning(true); // Re-enable scanning
 										}}
 									>
 										<Text className='font-semibold text-white'>Scan Again</Text>
 									</TouchableOpacity>
 								</View>
+							</View>
+						)}
+
+						{/* Camera Loading State */}
+						{!scanResult && mode === 'scan' && permission?.granted && !isCameraReady && (
+							<View className='absolute inset-0 z-20 items-center justify-center bg-black'>
+								<ActivityIndicator size='large' color='#ffffff' />
+								<Text className='mt-4 text-white'>Initializing Camera...</Text>
 							</View>
 						)}
 
@@ -485,13 +539,26 @@ export default function PaymentScreen() {
 										borderWidth: 4,
 										borderRadius: 16,
 										borderStyle: 'dashed',
-										borderColor: '#4F46E5',
+										borderColor: isCameraReady ? '#4F46E5' : '#9CA3AF',
 									}}
 								/>
 							</View>
 							<Text className='z-20 text-base text-white'>
-								Point your camera at a QR code to pay
+								{isCameraReady 
+									? 'Point your camera at a QR code to pay'
+									: 'Preparing camera...'}
 							</Text>
+							
+							{/* Debug info - remove in production */}
+							{__DEV__ && (
+								<View className='absolute bottom-10 left-4 right-4 p-2 bg-black/50 rounded'>
+									<Text className='text-xs text-white'>
+										Debug: Camera Ready: {isCameraReady ? 'Yes' : 'No'} | 
+										Scanning: {isScanning ? 'Yes' : 'No'} | 
+										Mode: {mode}
+									</Text>
+								</View>
+							)}
 						</View>
 					</View>
 				) : (
@@ -637,8 +704,18 @@ export default function PaymentScreen() {
 								<View className='p-4 mb-6 rounded-lg bg-gray-50'>
 									<Text className='text-sm text-gray-600'>Paying to:</Text>
 									<Text className='text-lg font-semibold'>
-										{paymentData.recipientName || 'Unknown User'}
+										{paymentData.businessName ||
+											paymentData.recipientName ||
+											'Unknown User'}
 									</Text>
+									{paymentData.businessName && (
+										<View className='flex-row items-center mt-1'>
+											<Ionicons name='business' size={14} color='#3B82F6' />
+											<Text className='ml-1 text-sm font-medium text-blue-600'>
+												Business
+											</Text>
+										</View>
+									)}
 									{paymentData.amount > 0 && (
 										<Text className='text-sm text-blue-600'>
 											Requested: ${paymentData.amount}
@@ -654,7 +731,7 @@ export default function PaymentScreen() {
 
 							<View className='mb-4'>
 								<Text className='mb-2 text-sm font-medium text-gray-700'>
-									Amount (USD)
+									Amount (USDC)
 								</Text>
 								<View className='flex-row items-center px-3 py-2 border border-gray-300 rounded-lg'>
 									<Text className='mr-2 text-lg font-bold text-blue-600'>
@@ -718,7 +795,7 @@ export default function PaymentScreen() {
 									<View className='flex-row items-center justify-center'>
 										<Ionicons name='card' size={20} color='white' />
 										<Text className='ml-2 font-semibold text-white'>
-											Send ${amount || '0.00'}
+											Send ${amount || '0.00'} USDC
 										</Text>
 									</View>
 								)}
@@ -756,7 +833,7 @@ export default function PaymentScreen() {
 
 							<View className='mb-4'>
 								<Text className='mb-2 text-sm font-medium text-gray-700'>
-									Request Amount (USD)
+									Request Amount (USDC)
 								</Text>
 								<View className='flex-row items-center px-3 py-2 border border-gray-300 rounded-lg'>
 									<Text className='mr-2 text-lg font-bold text-blue-600'>
@@ -814,6 +891,183 @@ export default function PaymentScreen() {
 							</View>
 						</View>
 					</KeyboardAvoidingView>
+				</Modal>
+
+				{/* Transaction Complete Modal */}
+				<Modal
+					visible={showTransactionCompleteModal}
+					animationType='slide'
+					presentationStyle='pageSheet'
+					onRequestClose={() => {
+						setShowTransactionCompleteModal(false);
+						router.replace('/(app)');
+					}}
+				>
+					<View className='flex-1 p-6 bg-white'>
+						<View className='items-center justify-center flex-1'>
+							{/* Success Icon */}
+							<View className='items-center justify-center w-24 h-24 mb-6 bg-green-100 rounded-full'>
+								<Ionicons name='checkmark-circle' size={60} color='#10B981' />
+							</View>
+
+							{/* Success Message */}
+							<Text className='mb-2 text-2xl font-bold text-center text-gray-900'>
+								Payment Successful!
+							</Text>
+
+							{completedTransaction && (
+								<Text className='mb-6 text-lg text-center text-gray-600'>
+									Successfully sent ${completedTransaction.amount.toFixed(2)} to{' '}
+									{completedTransaction.recipientType === 'business' &&
+									completedTransaction.businessName
+										? completedTransaction.businessName
+										: completedTransaction.recipientName}
+								</Text>
+							)}
+
+							{/* Transaction Details */}
+							<View className='w-full p-4 mb-6 border border-gray-200 bg-gray-50 rounded-xl'>
+								<Text className='mb-3 text-lg font-semibold text-gray-900'>
+									Transaction Details
+								</Text>
+
+								{completedTransaction && (
+									<>
+										<View className='flex-row items-center justify-between mb-2'>
+											<Text className='text-sm text-gray-600'>Amount:</Text>
+											<Text className='text-sm font-medium text-gray-900'>
+												${completedTransaction.amount.toFixed(2)} USDC
+											</Text>
+										</View>
+
+										<View className='flex-row items-center justify-between mb-2'>
+											<Text className='text-sm text-gray-600'>Recipient:</Text>
+											<Text className='text-sm font-medium text-gray-900'>
+												{completedTransaction.recipientType === 'business' &&
+												completedTransaction.businessName
+													? completedTransaction.businessName
+													: completedTransaction.recipientName}
+											</Text>
+										</View>
+
+										{completedTransaction.recipientType === 'business' &&
+											completedTransaction.businessName && (
+												<View className='flex-row items-center justify-between mb-2'>
+													<Text className='text-sm text-gray-600'>
+														Business:
+													</Text>
+													<Text className='text-sm font-medium text-blue-600'>
+														{completedTransaction.businessName}
+													</Text>
+												</View>
+											)}
+
+										<View className='flex-row items-center justify-between mb-2'>
+											<Text className='text-sm text-gray-600'>Gas Fee:</Text>
+											<Text className='text-sm font-medium text-gray-900'>
+												${completedTransaction.gas_fee?.toFixed(4)} ETH
+											</Text>
+										</View>
+
+										{completedTransaction.platform_fee && (
+											<View className='flex-row items-center justify-between mb-2'>
+												<Text className='text-sm text-gray-600'>
+													Platform Fee:
+												</Text>
+												<Text className='text-sm font-medium text-gray-900'>
+													${completedTransaction.platform_fee.toFixed(4)} USDC
+												</Text>
+											</View>
+										)}
+									</>
+								)}
+
+								{transactionHash && (
+									<View className='pt-3 mt-3 border-t border-gray-300'>
+										<Text className='mb-1 text-sm text-gray-600'>
+											Transaction Hash:
+										</Text>
+										<Text
+											className='font-mono text-xs text-blue-600'
+											numberOfLines={1}
+										>
+											{transactionHash}
+										</Text>
+
+										{completedTransaction?.blockNumber && (
+											<>
+												<Text className='mt-2 mb-1 text-sm text-gray-600'>
+													Block Number:
+												</Text>
+												<Text className='font-mono text-xs text-gray-800'>
+													{completedTransaction.blockNumber}
+												</Text>
+											</>
+										)}
+
+										{completedTransaction?.gasUsed && (
+											<>
+												<Text className='mt-2 mb-1 text-sm text-gray-600'>
+													Gas Used:
+												</Text>
+												<Text className='font-mono text-xs text-gray-800'>
+													{completedTransaction.gasUsed} units
+												</Text>
+											</>
+										)}
+
+										{completedTransaction?.effectiveGasPrice && (
+											<>
+												<Text className='mt-2 mb-1 text-sm text-gray-600'>
+													Gas Price:
+												</Text>
+												<Text className='font-mono text-xs text-gray-800'>
+													{parseFloat(
+														completedTransaction.effectiveGasPrice
+													).toFixed(8)}{' '}
+													ETH/gas
+												</Text>
+											</>
+										)}
+
+										<Text className='mt-2 mb-1 text-sm text-gray-600'>
+											Network:
+										</Text>
+										<Text className='font-mono text-xs text-gray-800'>
+											Base Sepolia
+										</Text>
+									</View>
+								)}
+							</View>
+
+							{/* Action Buttons */}
+							<View className='w-full space-y-3'>
+								<TouchableOpacity
+									className='w-full p-4 bg-blue-600 rounded-lg'
+									onPress={() => {
+										setShowTransactionCompleteModal(false);
+										router.replace('/(app)');
+									}}
+								>
+									<Text className='text-lg font-semibold text-center text-white'>
+										Go to Home
+									</Text>
+								</TouchableOpacity>
+
+								<TouchableOpacity
+									className='w-full p-4 border border-gray-300 rounded-lg'
+									onPress={() => {
+										setShowTransactionCompleteModal(false);
+										router.push('/(app)/transactions');
+									}}
+								>
+									<Text className='text-lg font-semibold text-center text-gray-700'>
+										View All Transactions
+									</Text>
+								</TouchableOpacity>
+							</View>
+						</View>
+					</View>
 				</Modal>
 			</View>
 		</KeyboardAvoidingView>

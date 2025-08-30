@@ -7,6 +7,7 @@ import {
 	Alert,
 	ActivityIndicator,
 	RefreshControl,
+	TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -17,7 +18,16 @@ import { useReactiveClient } from '@dynamic-labs/react-hooks';
 import { dynamicClient } from '@/lib/client';
 import { useWalletStore } from '@/stores/walletStore';
 import { useUserProfileStore } from '@/stores/userProfileStore';
+import { UserProfileService } from '@/services/userProfileService';
+import { AvatarService } from '@/services/avatarService';
+import {
+	TransactionService,
+	TransactionWithUsers,
+} from '@/services/transactionService';
+import { useBalanceStore } from '@/stores/balanceStore';
 import { router } from 'expo-router';
+
+// Types imported from services
 
 // Default avatar
 
@@ -29,11 +39,18 @@ export default function ProfileScreen() {
 	// User profile state
 	const {
 		currentProfile,
+		setCurrentProfile,
 		isLoading: profileLoading,
 		error,
 		loadProfileByWallet,
 		clearProfile,
 	} = useUserProfileStore();
+
+	// Balance state
+	const { getBalance, isLoading: balanceLoading } = useBalanceStore();
+	const currentBalance = walletAddress
+		? getBalance(walletAddress, 'usdc')?.formatted
+		: null;
 
 	// Privacy & Settings States
 	const [profileVisible, setProfileVisible] = useState(false);
@@ -46,6 +63,26 @@ export default function ProfileScreen() {
 	// Loading states
 	const [refreshing, setRefreshing] = useState(false);
 
+	// Editable profile state
+	const [editableProfile, setEditableProfile] = useState({
+		full_name: '',
+		username: '',
+		email: '',
+		bio: '',
+	});
+	const [isSavingProfile, setIsSavingProfile] = useState(false);
+	const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+	// Dynamic data states
+	const [transactions, setTransactions] = useState<TransactionWithUsers[]>([]);
+	const [stats, setStats] = useState({
+		totalTransactions: 0,
+		totalReceived: 0,
+		totalSent: 0,
+		thisMonth: 0,
+	});
+	const [isLoadingData, setIsLoadingData] = useState(false);
+
 	// Load profile data when wallet is connected - but only if we don't have a profile already
 	useEffect(() => {
 		if (walletAddress && isConnected && !currentProfile) {
@@ -57,13 +94,97 @@ export default function ProfileScreen() {
 		}
 	}, [walletAddress, isConnected, currentProfile]);
 
+	// Initialize editable profile when current profile changes
+	useEffect(() => {
+		if (currentProfile) {
+			setEditableProfile({
+				full_name: currentProfile.full_name || '',
+				username: currentProfile.username || '',
+				email: currentProfile.email || '',
+				bio: currentProfile.bio || '',
+			});
+			// Load dynamic data when profile is available
+			loadDynamicData();
+		}
+	}, [currentProfile]);
+
+	// Load dynamic data (transactions and stats)
+	const loadDynamicData = async () => {
+		if (!currentProfile?.id) return;
+
+		setIsLoadingData(true);
+		try {
+			console.log('📊 Loading dynamic profile data...');
+
+			// Load recent transactions
+			const userTransactions = await TransactionService.getUserTransactions(10);
+			console.log('✅ Loaded transactions:', userTransactions.length);
+
+			setTransactions(userTransactions);
+
+			// Calculate stats from transactions
+			const now = new Date();
+			const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+			const totalTransactions = userTransactions.length;
+			let totalReceived = 0;
+			let totalSent = 0;
+			let thisMonthAmount = 0;
+
+			userTransactions.forEach((tx: any) => {
+				const amount =
+					typeof tx.amount === 'string'
+						? parseFloat(tx.amount)
+						: tx.amount || 0;
+				const txDate = new Date(tx.created_at);
+
+				if (tx.to_user_id === currentProfile.id) {
+					totalReceived += amount;
+				} else {
+					totalSent += amount;
+				}
+
+				if (txDate >= thisMonth) {
+					if (tx.to_user_id === currentProfile.id) {
+						thisMonthAmount += amount;
+					}
+				}
+			});
+
+			setStats({
+				totalTransactions,
+				totalReceived,
+				totalSent,
+				thisMonth: thisMonthAmount,
+			});
+
+			console.log('📈 Profile stats calculated:', {
+				totalTransactions,
+				totalReceived,
+				totalSent,
+				thisMonth: thisMonthAmount,
+			});
+		} catch (error) {
+			console.error('❌ Error loading dynamic data:', error);
+		} finally {
+			setIsLoadingData(false);
+		}
+	};
+
 	// Handle pull-to-refresh
 	const onRefresh = async () => {
 		setRefreshing(true);
-		if (walletAddress) {
-			await loadProfileByWallet(walletAddress);
+		try {
+			if (walletAddress) {
+				await loadProfileByWallet(walletAddress);
+			}
+			// Also reload dynamic data
+			await loadDynamicData();
+		} catch (error) {
+			console.error('Error refreshing profile:', error);
+		} finally {
+			setRefreshing(false);
 		}
-		setRefreshing(false);
 	};
 
 	const handleEditProfile = () => {
@@ -112,6 +233,142 @@ export default function ProfileScreen() {
 		}
 	};
 
+	// Handle profile save
+	const handleSaveProfile = async () => {
+		if (!currentProfile?.id) {
+			Alert.alert('Error', 'Profile not found. Please try again.');
+			return;
+		}
+
+		// Basic validation
+		if (!editableProfile.full_name.trim()) {
+			Alert.alert('Validation Error', 'Full name is required.');
+			return;
+		}
+
+		if (!editableProfile.username.trim()) {
+			Alert.alert('Validation Error', 'Username is required.');
+			return;
+		}
+
+		if (!editableProfile.email.trim()) {
+			Alert.alert('Validation Error', 'Email is required.');
+			return;
+		}
+
+		if (!/\S+@\S+\.\S+/.test(editableProfile.email)) {
+			Alert.alert('Validation Error', 'Please enter a valid email address.');
+			return;
+		}
+
+		setIsSavingProfile(true);
+		try {
+			const updatedProfile = await UserProfileService.updateProfile(
+				String(currentProfile.id),
+				{
+					full_name: editableProfile.full_name.trim(),
+					username: editableProfile.username.trim(),
+					email: editableProfile.email.trim(),
+					bio: editableProfile.bio.trim() || null,
+				}
+			);
+
+			if (updatedProfile) {
+				setCurrentProfile(updatedProfile);
+				Alert.alert('Success', 'Profile updated successfully!');
+			} else {
+				Alert.alert('Error', 'Failed to update profile. Please try again.');
+			}
+		} catch (error) {
+			console.error('Error updating profile:', error);
+			Alert.alert('Error', 'Failed to update profile. Please try again.');
+		} finally {
+			setIsSavingProfile(false);
+		}
+	};
+
+	// Handle avatar upload
+	const handleAvatarPress = async () => {
+		if (!currentProfile?.id) return;
+
+		Alert.alert('Update Avatar', 'Choose how you want to update your avatar', [
+			{ text: 'Camera', onPress: () => uploadAvatar(true) },
+			{ text: 'Photo Library', onPress: () => uploadAvatar(false) },
+			{ text: 'Cancel', style: 'cancel' },
+		]);
+	};
+
+	const uploadAvatar = async (fromCamera: boolean) => {
+		if (!currentProfile?.id) return;
+
+		setIsUploadingAvatar(true);
+		try {
+			console.log('📸 Starting avatar upload process...');
+			const avatarUrl = await AvatarService.selectAndUploadAvatar(
+				currentProfile.id,
+				fromCamera
+			);
+
+			if (avatarUrl) {
+				console.log('✅ Avatar uploaded successfully:', avatarUrl);
+
+				// Update the profile in database immediately
+				try {
+					const updatedProfile = await UserProfileService.updateProfile(
+						String(currentProfile.id),
+						{
+							avatar_url: avatarUrl,
+						}
+					);
+
+					if (updatedProfile) {
+						setCurrentProfile(updatedProfile);
+						Alert.alert('Success', 'Avatar updated successfully!');
+					} else {
+						Alert.alert(
+							'Warning',
+							'Avatar uploaded but profile update failed. Please save your settings to sync.'
+						);
+					}
+				} catch (profileError) {
+					console.error(
+						'Error updating profile with new avatar:',
+						profileError
+					);
+					Alert.alert(
+						'Warning',
+						'Avatar uploaded but profile update failed. Please save your settings to sync.'
+					);
+				}
+			} else {
+				console.log('❌ Avatar upload returned null - user may have cancelled');
+			}
+		} catch (error) {
+			console.error('💥 Error uploading avatar:', error);
+
+			const errorMessage =
+				error instanceof Error
+					? error.message
+					: 'Failed to upload avatar. Please try again.';
+
+			Alert.alert('Upload Error', errorMessage);
+		} finally {
+			setIsUploadingAvatar(false);
+		}
+	};
+
+	// Get cache-busted avatar URL
+	const getCacheBustedAvatarUrl = () => {
+		if (currentProfile?.avatar_url && currentProfile.avatar_url.trim()) {
+			const cleanUrl = currentProfile.avatar_url.split('?')[0];
+			return `${cleanUrl}?v=${currentProfile?.updated_at || Date.now()}`;
+		}
+		return AvatarService.getAvatarUrl({
+			avatar_url: currentProfile?.avatar_url,
+			username: currentProfile?.username || userData.username || 'user',
+		});
+	};
+
 	// Get user data from profile or fallback to Dynamic auth
 	const userData = currentProfile
 		? {
@@ -135,15 +392,20 @@ export default function ProfileScreen() {
 					username: 'guest',
 				};
 
-	// Get user stats (simplified - will aggregate from transactions later)
+	// Get dynamic user stats
 	const userStats = {
-		totalTransactions: 0, // Will aggregate from transactions table
-		activeGroups: 0, // Not implemented yet
-		friendsConnected: 0, // Not using contacts anymore
-		portfolioValue: 0, // Will calculate from balance store
-		monthlyActivity: 0, // Will calculate from recent transactions
-		totalSent: 0, // Will aggregate from transactions
-		totalReceived: 0, // Will aggregate from transactions
+		totalTransactions: stats.totalTransactions,
+		activeGroups:
+			transactions.length > 0 ? Math.ceil(transactions.length / 5) : 0, // Estimated active groups
+		friendsConnected: new Set(
+			transactions.map((tx) =>
+				tx.to_user_id === currentProfile?.id ? tx.from_user_id : tx.to_user_id
+			)
+		).size, // Unique users interacted with
+		portfolioValue: currentBalance ? parseFloat(currentBalance) : 0, // Current balance
+		monthlyActivity: stats.thisMonth,
+		totalSent: stats.totalSent,
+		totalReceived: stats.totalReceived,
 	};
 
 	// Show loading state
@@ -597,6 +859,224 @@ export default function ProfileScreen() {
 						</LinearGradient>
 					</View>
 				</View>
+
+				{/* Profile Edit Section */}
+				<View className='p-6 mb-6 bg-white shadow-sm rounded-2xl md:p-8 md:max-w-2xl md:mx-auto'>
+					<Text className='mb-6 text-xl font-semibold text-gray-900 md:text-2xl md:text-center'>
+						Profile Information
+					</Text>
+
+					{/* Avatar Section */}
+					<View className='items-center mb-6'>
+						<View className='relative mb-4'>
+							<Image
+								source={{ uri: getCacheBustedAvatarUrl() }}
+								style={{
+									width: 100,
+									height: 100,
+									borderRadius: 50,
+									backgroundColor: '#f3f4f6',
+								}}
+								contentFit='cover'
+							/>
+							<TouchableOpacity
+								className='absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full items-center justify-center border-3 border-white'
+								onPress={handleAvatarPress}
+								disabled={isUploadingAvatar}
+							>
+								{isUploadingAvatar ? (
+									<ActivityIndicator size='small' color='white' />
+								) : (
+									<Ionicons name='camera' size={16} color='white' />
+								)}
+							</TouchableOpacity>
+						</View>
+						<Text className='text-sm text-gray-600 text-center'>
+							Tap to update your profile photo
+						</Text>
+					</View>
+
+					{/* Profile Form */}
+					<View className='space-y-4'>
+						{/* Full Name */}
+						<View className='mb-4'>
+							<Text className='mb-2 text-sm font-medium text-gray-700'>
+								Full Name
+							</Text>
+							<TextInput
+								className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
+								value={editableProfile.full_name}
+								onChangeText={(value) =>
+									setEditableProfile({ ...editableProfile, full_name: value })
+								}
+								placeholder='Enter your full name'
+								placeholderTextColor='#9ca3af'
+							/>
+						</View>
+
+						{/* Username */}
+						<View className='mb-4'>
+							<Text className='mb-2 text-sm font-medium text-gray-700'>
+								Username
+							</Text>
+							<TextInput
+								className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
+								value={editableProfile.username}
+								onChangeText={(value) =>
+									setEditableProfile({ ...editableProfile, username: value })
+								}
+								placeholder='Enter your username'
+								placeholderTextColor='#9ca3af'
+								autoCapitalize='none'
+							/>
+						</View>
+
+						{/* Email */}
+						<View className='mb-4'>
+							<Text className='mb-2 text-sm font-medium text-gray-700'>
+								Email
+							</Text>
+							<TextInput
+								className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
+								value={editableProfile.email}
+								onChangeText={(value) =>
+									setEditableProfile({ ...editableProfile, email: value })
+								}
+								placeholder='Enter your email'
+								placeholderTextColor='#9ca3af'
+								keyboardType='email-address'
+								autoCapitalize='none'
+							/>
+						</View>
+
+						{/* Bio */}
+						<View className='mb-4'>
+							<Text className='mb-2 text-sm font-medium text-gray-700'>
+								Bio
+							</Text>
+							<TextInput
+								className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
+								value={editableProfile.bio}
+								onChangeText={(value) =>
+									setEditableProfile({ ...editableProfile, bio: value })
+								}
+								placeholder='Tell us about yourself...'
+								placeholderTextColor='#9ca3af'
+								multiline
+								numberOfLines={3}
+								textAlignVertical='top'
+								style={{ minHeight: 80 }}
+							/>
+						</View>
+
+						{/* Save Button */}
+						<TouchableOpacity
+							className={`flex-row items-center justify-center w-full p-4 mt-6 rounded-lg ${
+								isSavingProfile ? 'bg-gray-400' : 'bg-blue-600'
+							}`}
+							onPress={handleSaveProfile}
+							disabled={isSavingProfile}
+						>
+							{isSavingProfile ? (
+								<ActivityIndicator size='small' color='white' />
+							) : (
+								<Ionicons name='checkmark-circle' size={20} color='white' />
+							)}
+							<Text className='ml-2 text-base font-semibold text-white'>
+								{isSavingProfile ? 'Saving...' : 'Save Profile'}
+							</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+
+				{/* Recent Transactions Section */}
+				<View className='p-6 mb-6 bg-white shadow-sm rounded-2xl md:p-8 md:max-w-2xl md:mx-auto'>
+					<View className='flex-row items-center justify-between mb-4'>
+						<Text className='text-xl font-semibold text-gray-900 md:text-2xl'>
+							Recent Activity
+						</Text>
+						{isLoadingData && (
+							<ActivityIndicator size='small' color='#3b82f6' />
+						)}
+					</View>
+
+					{transactions.length > 0 ? (
+						<View className='space-y-3'>
+							{transactions.slice(0, 5).map((transaction, index) => {
+								const isReceived =
+									transaction.to_user_id === currentProfile?.id;
+								const otherUser = isReceived
+									? transaction.from_user
+									: transaction.to_user;
+								const amount =
+									typeof transaction.amount === 'string'
+										? parseFloat(transaction.amount)
+										: transaction.amount || 0;
+
+								return (
+									<View
+										key={transaction.id}
+										className='flex-row items-center justify-between p-3 bg-gray-50 rounded-lg'
+									>
+										<View className='flex-row items-center flex-1'>
+											<View
+												className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+													isReceived ? 'bg-green-100' : 'bg-red-100'
+												}`}
+											>
+												<Ionicons
+													name={isReceived ? 'arrow-down' : 'arrow-up'}
+													size={16}
+													color={isReceived ? '#10b981' : '#ef4444'}
+												/>
+											</View>
+											<View className='flex-1'>
+												<Text className='font-medium text-gray-900'>
+													{isReceived ? 'Received from' : 'Sent to'}{' '}
+													{otherUser?.display_name ||
+														otherUser?.username ||
+														'Unknown'}
+												</Text>
+												<Text className='text-sm text-gray-500'>
+													{new Date(
+														transaction.created_at
+													).toLocaleDateString()}
+												</Text>
+											</View>
+										</View>
+										<Text
+											className={`font-semibold ${
+												isReceived ? 'text-green-600' : 'text-red-600'
+											}`}
+										>
+											{isReceived ? '+' : '-'}${amount.toFixed(2)}
+										</Text>
+									</View>
+								);
+							})}
+
+							{transactions.length > 5 && (
+								<TouchableOpacity
+									className='p-3 bg-blue-50 rounded-lg items-center'
+									onPress={() => router.push('/(app)/track')}
+								>
+									<Text className='text-blue-600 font-medium'>
+										View All Transactions ({transactions.length})
+									</Text>
+								</TouchableOpacity>
+							)}
+						</View>
+					) : (
+						<View className='items-center py-8'>
+							<Ionicons name='receipt-outline' size={48} color='#d1d5db' />
+							<Text className='mt-3 text-gray-500'>No recent transactions</Text>
+							<Text className='text-sm text-gray-400'>
+								Your transaction history will appear here
+							</Text>
+						</View>
+					)}
+				</View>
+
 				{/* Primary Actions Section */}
 				<View className='p-6 mb-6 bg-white shadow-sm rounded-2xl md:p-8 md:max-w-2xl md:mx-auto'>
 					<Text className='mb-6 text-xl font-semibold text-gray-900 md:text-2xl md:text-center'>
@@ -656,12 +1136,14 @@ export default function ProfileScreen() {
 							{
 								icon: 'wallet',
 								title: 'USDC Balance',
-								subtitle: '$2,847.50',
+								subtitle: currentBalance ? `$${currentBalance}` : '$0.00',
 							},
 							{
 								icon: 'card',
 								title: 'Payment Methods',
-								subtitle: '2 linked accounts',
+								subtitle: currentProfile
+									? '1 wallet connected'
+									: 'No wallet connected',
 							},
 							{
 								icon: 'shield-checkmark',

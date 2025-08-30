@@ -28,6 +28,7 @@ import { useWalletStore } from '@/stores/walletStore';
 import { useBalanceStore } from '@/stores/balanceStore';
 import { useUserProfileStore } from '@/stores/userProfileStore';
 import { UserProfileService } from '@/services/userProfileService';
+
 import { UserProfile } from '@/types/supabase';
 
 export default function ActivityScreen() {
@@ -70,6 +71,7 @@ export default function ActivityScreen() {
 	const [showPotDetailModal, setShowPotDetailModal] = useState(false);
 	const [selectedPot, setSelectedPot] = useState<SavingsPot | null>(null);
 	const [fundAmount, setFundAmount] = useState('');
+	const [showYieldBadge, setShowYieldBadge] = useState(false);
 
 	// Custom pot creation state
 	const [customPotName, setCustomPotName] = useState('');
@@ -112,6 +114,24 @@ export default function ActivityScreen() {
 			loadProfileByWallet(walletAddress);
 		}
 	}, [walletAddress]);
+
+	// Load on-chain USDC balance and pot balance when wallet connects
+	useEffect(() => {
+		if (walletAddress && isConnected) {
+		}
+	}, [walletAddress, isConnected]);
+
+	// Show yield badge after 2 seconds when auto invest is enabled
+	useEffect(() => {
+		if (globalAutoInvestEnabled) {
+			const timer = setTimeout(() => {
+				setShowYieldBadge(true);
+			}, 2000);
+			return () => clearTimeout(timer);
+		} else {
+			setShowYieldBadge(false);
+		}
+	}, [globalAutoInvestEnabled]);
 
 	// Filter pots based on search and category
 	const filteredPots = getActivePots().filter((pot) => {
@@ -352,7 +372,7 @@ export default function ActivityScreen() {
 	};
 
 	// Handle custom pot creation
-	const handleCreateCustomPot = () => {
+	const handleCreateCustomPot = async () => {
 		if (!customPotName.trim()) {
 			Alert.alert(
 				'Missing Information',
@@ -384,9 +404,16 @@ export default function ActivityScreen() {
 				: undefined,
 		};
 
-		createPot(customPotData);
-		handleCloseCustomModal();
-		Alert.alert('Success', `${customPotName} pot created successfully!`);
+		try {
+			// Create regular database pot
+			await createPot(customPotData);
+			Alert.alert('Success', `${customPotName} pot created successfully!`);
+
+			handleCloseCustomModal();
+		} catch (error) {
+			console.error('Error creating pot:', error);
+			Alert.alert('Error', 'Failed to create pot. Please try again.');
+		}
 	};
 
 	// Handle adding funds
@@ -405,11 +432,14 @@ export default function ActivityScreen() {
 		}
 
 		try {
+			// Handle regular database pot funding
 			await addFunds(selectedPot.id, amount);
+
 			setShowPotDetailModal(false);
 			setFundAmount('');
 			Alert.alert('Success', `Added $${amount} to ${selectedPot.name}!`);
 		} catch (error) {
+			console.error('Error adding funds:', error);
 			Alert.alert('Error', 'Failed to add funds. Please try again.');
 		}
 	};
@@ -616,17 +646,28 @@ export default function ActivityScreen() {
 						</Text>
 					</View>
 					<View className='flex-1 p-4 border border-green-200 bg-green-50 rounded-xl'>
-						<View className='flex-row items-center mb-1'>
-							<Ionicons name='trending-up' size={16} color='#10B981' />
-							<Text className='ml-2 text-sm font-medium text-green-600'>
-								Yield Earned
-							</Text>
+						<View className='flex-row items-center justify-between mb-1'>
+							<View className='flex-row items-center'>
+								<Ionicons name='trending-up' size={16} color='#10B981' />
+								<Text className='ml-2 text-sm font-medium text-green-600'>
+									Yield Earned
+								</Text>
+							</View>
+							{globalAutoInvestEnabled &&
+								showYieldBadge &&
+								getAverageYield() > 0 && (
+									<View className='px-2 py-1 bg-green-200 rounded-full'>
+										<Text className='text-xs font-semibold text-green-800'>
+											{getAverageYield().toFixed(1)}%
+										</Text>
+									</View>
+								)}
 						</View>
 						<Text className='text-xl font-bold text-green-900'>
 							{formatCurrency(getTotalYieldEarned())}
 						</Text>
 						{getAverageYield() > 0 && (
-							<Text className='text-sm text-green-700 mt-1'>
+							<Text className='mt-1 text-sm text-green-700'>
 								Avg {getAverageYield().toFixed(1)}% APY
 							</Text>
 						)}
@@ -1122,7 +1163,7 @@ export default function ActivityScreen() {
 													</Text>
 													<TouchableOpacity
 														onPress={() => setShowDatePicker(true)}
-														className='p-3 border border-gray-300 rounded-lg focus:border-red-500 flex-row items-center justify-between'
+														className='flex-row items-center justify-between p-3 border border-gray-300 rounded-lg focus:border-red-500'
 													>
 														<Text
 															className={
@@ -1208,7 +1249,7 @@ export default function ActivityScreen() {
 
 														{/* Search Results */}
 														{searchResults.length > 0 && (
-															<View className='mb-2 border border-gray-200 rounded-lg bg-white'>
+															<View className='mb-2 bg-white border border-gray-200 rounded-lg'>
 																{searchResults.map((user) => (
 																	<TouchableOpacity
 																		key={user.id}
@@ -1479,7 +1520,7 @@ export default function ActivityScreen() {
 
 										{/* Strict Deadline */}
 										{selectedPot?.isStrict && selectedPot?.strictDeadline && (
-											<View className='p-3 mb-4 border border-red-200 bg-red-50 rounded-lg'>
+											<View className='p-3 mb-4 border border-red-200 rounded-lg bg-red-50'>
 												<View className='flex-row items-center'>
 													<Ionicons
 														name='lock-closed'
@@ -1509,16 +1550,16 @@ export default function ActivityScreen() {
 
 											{/* Creator */}
 											<View className='mb-3'>
-												<View className='flex-row items-center p-3 border border-gray-200 bg-white rounded-lg'>
+												<View className='flex-row items-center p-3 bg-white border border-gray-200 rounded-lg'>
 													<View
-														className='w-10 h-10 rounded-full items-center justify-center mr-3'
+														className='items-center justify-center w-10 h-10 mr-3 rounded-full'
 														style={{
 															backgroundColor: getUserAvatar(
 																walletAddress || 'you'
 															).backgroundColor,
 														}}
 													>
-														<Text className='text-white font-semibold'>
+														<Text className='font-semibold text-white'>
 															{getUserAvatar(walletAddress || 'you').letter}
 														</Text>
 													</View>
@@ -1544,24 +1585,24 @@ export default function ActivityScreen() {
 													{selectedPot.collaborators &&
 														selectedPot.collaborators.length > 0 && (
 															<View className='mb-3'>
-																<Text className='text-sm font-medium text-gray-700 mb-2'>
+																<Text className='mb-2 text-sm font-medium text-gray-700'>
 																	Collaborators
 																</Text>
 																{selectedPot.collaborators.map(
 																	(collaborator, index) => (
 																		<View
 																			key={index}
-																			className='flex-row items-center p-3 mb-2 border border-gray-200 bg-white rounded-lg'
+																			className='flex-row items-center p-3 mb-2 bg-white border border-gray-200 rounded-lg'
 																		>
 																			<View
-																				className='w-10 h-10 rounded-full items-center justify-center mr-3'
+																				className='items-center justify-center w-10 h-10 mr-3 rounded-full'
 																				style={{
 																					backgroundColor:
 																						getUserAvatar(collaborator)
 																							.backgroundColor,
 																				}}
 																			>
-																				<Text className='text-white font-semibold'>
+																				<Text className='font-semibold text-white'>
 																					{getUserAvatar(collaborator).letter}
 																				</Text>
 																			</View>
@@ -1587,24 +1628,24 @@ export default function ActivityScreen() {
 													{selectedPot.invitedUsers &&
 														selectedPot.invitedUsers.length > 0 && (
 															<View className='mb-3'>
-																<Text className='text-sm font-medium text-gray-700 mb-2'>
+																<Text className='mb-2 text-sm font-medium text-gray-700'>
 																	Pending Invitations
 																</Text>
 																{selectedPot.invitedUsers.map(
 																	(invited, index) => (
 																		<View
 																			key={index}
-																			className='flex-row items-center p-3 mb-2 border border-gray-200 bg-gray-50 rounded-lg'
+																			className='flex-row items-center p-3 mb-2 border border-gray-200 rounded-lg bg-gray-50'
 																		>
 																			<View
-																				className='w-10 h-10 rounded-full items-center justify-center mr-3'
+																				className='items-center justify-center w-10 h-10 mr-3 rounded-full'
 																				style={{
 																					backgroundColor:
 																						getUserAvatar(invited)
 																							.backgroundColor,
 																				}}
 																			>
-																				<Text className='text-white font-semibold'>
+																				<Text className='font-semibold text-white'>
 																					{getUserAvatar(invited).letter}
 																				</Text>
 																			</View>

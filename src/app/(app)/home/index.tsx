@@ -80,6 +80,7 @@ export default function HomeScreen() {
 	const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
 	const [recentActivity, setRecentActivity] = useState<any[]>([]);
 	const [activityLoading, setActivityLoading] = useState(false);
+	const [statsLoading, setStatsLoading] = useState(false);
 
 	// Modal states
 	const [sendModalVisible, setSendModalVisible] = useState(false);
@@ -164,10 +165,11 @@ export default function HomeScreen() {
 		}
 	}, [walletAddress, isWalletConnected, fetchBalances]);
 
-	// Fetch recent activity when wallet connects
+	// Fetch recent activity and weekly stats when wallet connects
 	useEffect(() => {
 		if (walletAddress && isWalletConnected) {
 			fetchRecentActivity();
+			refreshWeeklyStats();
 		}
 	}, [walletAddress, isWalletConnected]);
 
@@ -207,21 +209,7 @@ export default function HomeScreen() {
 		}
 	}, [auth.authenticatedUser]);
 
-	// Simulate real-time stats updates
-	useEffect(() => {
-		const updateStats = () => {
-			setDynamicStats((prev) => ({
-				...prev,
-				sent: prev.sent + Math.random() * 10,
-				received: prev.received + Math.random() * 5,
-				transactions: prev.transactions + Math.floor(Math.random() * 2),
-			}));
-		};
-
-		const statsInterval = setInterval(updateStats, 30000); // Update every 30 seconds
-
-		return () => clearInterval(statsInterval);
-	}, []);
+	// No more random stats updates - using real data only
 
 	const handleSend = async () => {
 		if (!connectedWallet) {
@@ -243,12 +231,78 @@ export default function HomeScreen() {
 		setIsLoading(true);
 
 		try {
-			await fetchBalances(walletAddress, true); // Force refresh
+			// Refresh balances, recent activity, and weekly stats in parallel
+			await Promise.all([
+				fetchBalances(walletAddress, true),
+				fetchRecentActivity(),
+				refreshWeeklyStats(),
+			]);
 			console.log('Manual refresh completed');
 		} catch (error) {
 			console.error('Error during manual refresh:', error);
 		} finally {
 			setIsLoading(false);
+		}
+	};
+
+	// Refresh weekly stats from real transaction data
+	const refreshWeeklyStats = async () => {
+		if (!walletAddress) return;
+
+		setStatsLoading(true);
+		try {
+			const stats = await calculateWeeklyStats();
+			setDynamicStats(stats);
+			console.log('Weekly stats updated:', stats);
+		} catch (error) {
+			console.error('Error refreshing weekly stats:', error);
+		} finally {
+			setStatsLoading(false);
+		}
+	};
+
+	// Calculate weekly stats from real transaction data
+	const calculateWeeklyStats = async () => {
+		if (!walletAddress) return mockWeeklyStats;
+
+		try {
+			// Get transactions from the last 7 days
+			const allTransactions = await TransactionService.getUserTransactions(1000); // Get enough transactions
+			
+			// Calculate start of current week (7 days ago)
+			const oneWeekAgo = new Date();
+			oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+			oneWeekAgo.setHours(0, 0, 0, 0); // Start of day
+
+			// Filter transactions from this week
+			const thisWeekTransactions = allTransactions.filter(transaction => {
+				const transactionDate = new Date(transaction.created_at);
+				return transactionDate >= oneWeekAgo;
+			});
+
+			let sent = 0;
+			let received = 0;
+			let transactionCount = thisWeekTransactions.length;
+
+			// Calculate sent and received amounts
+			thisWeekTransactions.forEach(transaction => {
+				const isSent = transaction.from_user?.wallet_address === walletAddress;
+				
+				if (isSent) {
+					sent += transaction.amount;
+				} else {
+					received += transaction.amount;
+				}
+			});
+
+			return {
+				sent,
+				received,
+				transactions: transactionCount,
+			};
+		} catch (error) {
+			console.error('Error calculating weekly stats:', error);
+			return mockWeeklyStats; // Fallback to mock data
 		}
 	};
 
@@ -401,19 +455,14 @@ export default function HomeScreen() {
 			category,
 			potId,
 		});
-		// Update stats
-		setDynamicStats((prev) => ({
-			...prev,
-			sent: prev.sent + amount,
-			transactions: prev.transactions + 1,
-		}));
 
-		// Invalidate balances to trigger refresh
+		// Invalidate balances and refresh all data after sending
 		if (walletAddress) {
-			// Force refresh balances after sending
+			// Force refresh balances, activity, and stats after sending
 			setTimeout(() => {
 				fetchBalances(walletAddress, true);
-				fetchRecentActivity(); // Also refresh recent activity
+				fetchRecentActivity(); // Refresh recent activity
+				refreshWeeklyStats(); // Refresh weekly stats with new transaction
 			}, 2000); // Wait 2 seconds for transaction to be confirmed
 		}
 
@@ -504,7 +553,7 @@ export default function HomeScreen() {
 					received={dynamicStats.received}
 					transactions={dynamicStats.transactions}
 					onRefresh={handleRefresh}
-					isLoading={isLoading}
+					isLoading={isLoading || statsLoading}
 				/>
 
 				{/* Quick Actions */}
