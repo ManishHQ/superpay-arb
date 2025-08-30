@@ -4,13 +4,16 @@ import {
 	ScrollView,
 	TouchableOpacity,
 	Dimensions,
+	ActivityIndicator,
+	RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PieChart, LineChart, BarChart } from 'react-native-gifted-charts';
 import { useSavingsPotsStore } from '@/stores/savingsPotsStore';
+import { TransactionService } from '@/services/transactionService';
 
 const { width } = Dimensions.get('window');
 
@@ -178,8 +181,17 @@ const recentSpending = [
 ];
 
 export default function TrackScreen() {
-	const [timeFrame, setTimeFrame] = useState('week'); // 'week' or 'month'
+	const [timeFrame, setTimeFrame] = useState<'week' | 'month'>('week');
 	const [chartView, setChartView] = useState('combined'); // 'spending' | 'yield' | 'combined'
+	const [isLoading, setIsLoading] = useState(true);
+	const [isRefreshing, setIsRefreshing] = useState(false);
+
+	// Dynamic data state
+	const [spendingCategories, setSpendingCategories] = useState<any[]>([]);
+	const [recentSpending, setRecentSpending] = useState<any[]>([]);
+	const [financialData, setFinancialData] = useState<any[]>([]);
+	const [totalSpending, setTotalSpending] = useState(0);
+	const [totalYield, setTotalYield] = useState(0);
 
 	// Get savings pots store data
 	const {
@@ -193,14 +205,71 @@ export default function TrackScreen() {
 	// Calculate yield stats
 	const yieldEnabledPots = activePots.filter((pot) => pot.isYieldEnabled);
 	const totalSaved = getTotalSavings();
-	const totalSpending = timeFrame === 'week' ? 716.0 : 2847.5;
-	const totalYield = timeFrame === 'week' ? 118.6 : 683.8;
 	const netCashFlow = totalYield - totalSpending;
 	const averageAPY =
 		yieldEnabledPots.length > 0
 			? yieldEnabledPots.reduce((sum, pot) => sum + (pot.apy || 0), 0) /
 				yieldEnabledPots.length
 			: 0;
+
+	// Load data from database
+	const loadData = async () => {
+		try {
+			setIsLoading(true);
+
+			// Load spending analytics
+			const analytics =
+				await TransactionService.getSpendingAnalytics(timeFrame);
+			setSpendingCategories(analytics.categoryData);
+			setRecentSpending(analytics.recentTransactions);
+			setTotalSpending(analytics.totalSpending);
+
+			// Load time series data for charts
+			const timeSeriesData =
+				await TransactionService.getTimeSeriesData(timeFrame);
+			setFinancialData(timeSeriesData);
+
+			// Calculate total yield from time series data
+			const yieldSum = timeSeriesData.reduce(
+				(sum, item) => sum + item.yield,
+				0
+			);
+			setTotalYield(yieldSum);
+		} catch (error) {
+			console.error('Error loading track data:', error);
+			// Keep using fallback data if database fails
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	const handleRefresh = async () => {
+		setIsRefreshing(true);
+		await loadData();
+		setIsRefreshing(false);
+	};
+
+	// Load data on mount and when timeFrame changes
+	useEffect(() => {
+		loadData();
+	}, [timeFrame]);
+
+	// Generate pie chart data from dynamic spending categories
+	const pieData = spendingCategories.map((category, index) => ({
+		value: category.value,
+		color: category.color,
+		gradientCenterColor: category.color,
+		focused: index === 0,
+		text: `${category.percentage}%`,
+	}));
+
+	// Get current financial data based on timeFrame
+	const currentFinancialData =
+		financialData.length > 0
+			? financialData
+			: timeFrame === 'week'
+				? weeklyFinancialData
+				: monthlyFinancialData;
 
 	const renderDot = (color: string) => {
 		return (
@@ -216,11 +285,33 @@ export default function TrackScreen() {
 		);
 	};
 
+	// Show loading state
+	if (isLoading) {
+		return (
+			<SafeAreaView className='flex-1 bg-gray-200'>
+				<View className='flex-1 justify-center items-center'>
+					<ActivityIndicator size='large' color='#3b82f6' />
+					<Text className='mt-4 text-gray-600'>
+						Loading your spending data...
+					</Text>
+				</View>
+			</SafeAreaView>
+		);
+	}
+
 	return (
 		<SafeAreaView className='flex-1 bg-gray-200'>
 			<ScrollView
 				className='flex-1 px-6 py-6'
 				showsVerticalScrollIndicator={false}
+				refreshControl={
+					<RefreshControl
+						refreshing={isRefreshing}
+						onRefresh={handleRefresh}
+						colors={['#3b82f6']}
+						tintColor='#3b82f6'
+					/>
+				}
 			>
 				{/* Header */}
 				<View className='mb-6'>
@@ -369,7 +460,7 @@ export default function TrackScreen() {
 					<View style={{ alignItems: 'center', overflow: 'hidden' }}>
 						{timeFrame === 'week' ? (
 							<BarChart
-								data={weeklyFinancialData.map((item) => ({
+								data={currentFinancialData.map((item) => ({
 									value:
 										chartView === 'spending'
 											? item.spending
@@ -403,7 +494,7 @@ export default function TrackScreen() {
 							/>
 						) : (
 							<LineChart
-								data={monthlyFinancialData.map((item) => ({
+								data={currentFinancialData.map((item) => ({
 									value:
 										chartView === 'spending'
 											? item.spending
@@ -488,7 +579,7 @@ export default function TrackScreen() {
 												fontWeight: 'bold',
 											}}
 										>
-											${timeFrame === 'week' ? '716' : '2,847'}
+											${totalSpending.toFixed(0)}
 										</Text>
 										<Text style={{ fontSize: 12, color: '#9CA3AF' }}>
 											Total
@@ -500,34 +591,47 @@ export default function TrackScreen() {
 					</View>
 
 					{/* Category List */}
-					{spendingCategories.slice(0, 3).map((category) => (
-						<View
-							key={category.id}
-							className='flex-row items-center justify-between py-2'
-						>
-							<View className='flex-row items-center flex-1'>
-								{renderDot(category.color)}
-								<Text className='mr-3 text-lg'>{category.icon}</Text>
-								<View className='flex-1'>
-									<Text className='text-base font-medium text-gray-900'>
-										{category.name}
-									</Text>
-									<Text className='text-sm text-gray-500'>
-										{category.percentage}%
-									</Text>
-								</View>
-							</View>
-							<Text className='text-base font-semibold text-gray-900'>
-								${category.amount}
+					{spendingCategories.length === 0 ? (
+						<View className='items-center py-8'>
+							<Text className='text-gray-500 text-center'>
+								No spending data available for this {timeFrame}.
+							</Text>
+							<Text className='text-gray-400 text-sm text-center mt-2'>
+								Make some transactions to see your spending patterns.
 							</Text>
 						</View>
-					))}
+					) : (
+						spendingCategories.slice(0, 3).map((category) => (
+							<View
+								key={category.id}
+								className='flex-row items-center justify-between py-2'
+							>
+								<View className='flex-row items-center flex-1'>
+									{renderDot(category.color)}
+									<Text className='mr-3 text-lg'>{category.icon}</Text>
+									<View className='flex-1'>
+										<Text className='text-base font-medium text-gray-900'>
+											{category.name}
+										</Text>
+										<Text className='text-sm text-gray-500'>
+											{category.percentage}%
+										</Text>
+									</View>
+								</View>
+								<Text className='text-base font-semibold text-gray-900'>
+									${category.amount}
+								</Text>
+							</View>
+						))
+					)}
 
-					<TouchableOpacity className='py-2 mt-3'>
-						<Text className='text-sm font-medium text-center text-blue-600'>
-							View all categories
-						</Text>
-					</TouchableOpacity>
+					{spendingCategories.length > 0 && (
+						<TouchableOpacity className='py-2 mt-3'>
+							<Text className='text-sm font-medium text-center text-blue-600'>
+								View all categories
+							</Text>
+						</TouchableOpacity>
+					)}
 				</View>
 
 				{/* Recent Spending */}
@@ -542,25 +646,36 @@ export default function TrackScreen() {
 							</Text>
 						</TouchableOpacity>
 					</View>
-					{recentSpending.slice(0, 4).map((item) => (
-						<View
-							key={item.id}
-							className='flex-row items-center justify-between py-3'
-						>
-							<View className='flex-row items-center flex-1'>
-								<Text className='mr-3 text-xl'>{item.icon}</Text>
-								<View className='flex-1'>
-									<Text className='text-base font-medium text-gray-900'>
-										{item.name}
-									</Text>
-									<Text className='text-sm text-gray-500'>{item.time}</Text>
-								</View>
-							</View>
-							<Text className='text-base font-semibold text-gray-900'>
-								-${item.amount}
+					{recentSpending.length === 0 ? (
+						<View className='items-center py-8'>
+							<Text className='text-gray-500 text-center'>
+								No recent transactions found.
+							</Text>
+							<Text className='text-gray-400 text-sm text-center mt-2'>
+								Your recent spending will appear here.
 							</Text>
 						</View>
-					))}
+					) : (
+						recentSpending.slice(0, 4).map((item) => (
+							<View
+								key={item.id}
+								className='flex-row items-center justify-between py-3'
+							>
+								<View className='flex-row items-center flex-1'>
+									<Text className='mr-3 text-xl'>{item.icon}</Text>
+									<View className='flex-1'>
+										<Text className='text-base font-medium text-gray-900'>
+											{item.name}
+										</Text>
+										<Text className='text-sm text-gray-500'>{item.time}</Text>
+									</View>
+								</View>
+								<Text className='text-base font-semibold text-gray-900'>
+									-${item.amount}
+								</Text>
+							</View>
+						))
+					)}
 				</View>
 
 				{/* Insights */}

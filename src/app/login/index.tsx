@@ -8,11 +8,18 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	ScrollView,
+	StyleSheet,
+	ActivityIndicator,
+	Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { dynamicClient } from '@/lib/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useReactiveClient } from '@dynamic-labs/react-hooks';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const { width } = Dimensions.get('window');
 
 export default function LoginPage() {
 	const [usedOneTimePasswordMethod, setUsedOneTimePasswordMethod] = useState<
@@ -34,11 +41,12 @@ export default function LoginPage() {
 	// Conditional rendering after all hooks
 	if (!sdk.loaded) {
 		return (
-			<View className='justify-center flex-1 p-5 bg-gray-50'>
-				<Text className='mb-10 text-3xl font-bold text-center text-gray-800'>
-					Loading...
-				</Text>
-			</View>
+			<SafeAreaView style={styles.container}>
+				<View style={styles.loadingContainer}>
+					<ActivityIndicator size='large' color='#3b82f6' />
+					<Text style={styles.loadingText}>Initializing SuperPay...</Text>
+				</View>
+			</SafeAreaView>
 		);
 	}
 
@@ -54,12 +62,11 @@ export default function LoginPage() {
 
 	const handleEmailLogin = (email: string) => {
 		if (!email.trim()) {
-			Alert.alert('Error', 'Please enter a valid email address');
+			Alert.alert('Error', 'Please enter your email address');
 			return;
 		}
 
 		setIsLoading(true);
-		console.log('Attempting to send email OTP to:', email);
 
 		try {
 			dynamicClient.auth.email
@@ -90,12 +97,11 @@ export default function LoginPage() {
 
 	const handleSMSLogin = (phone: string) => {
 		if (!phone.trim()) {
-			Alert.alert('Error', 'Please enter a valid phone number');
+			Alert.alert('Error', 'Please enter your phone number');
 			return;
 		}
 
 		setIsLoading(true);
-		console.log('Attempting to send SMS OTP to:', phone);
 
 		try {
 			dynamicClient.auth.sms
@@ -188,168 +194,402 @@ export default function LoginPage() {
 	const renderContent = () => {
 		if (usedOneTimePasswordMethod !== null) {
 			return (
-				<>
-					<View className='mb-8'>
-						<View className='mb-4'>
-							<Text className='text-lg font-semibold text-gray-700'>
-								Enter OTP Token
-							</Text>
-							<Text className='mt-1 text-sm text-gray-500'>
-								Enter the 6-digit code sent to your{' '}
-								{usedOneTimePasswordMethod === 'email' ? 'email' : 'phone'}
-							</Text>
-						</View>
-						<View className='flex-col gap-3'>
-							<TextInput
-								className='w-full px-4 py-3 text-lg bg-white border border-gray-300 rounded-lg'
-								placeholder={isLoading ? 'Verifying...' : 'OTP token'}
-								value={otpToken}
-								onChangeText={setOtpToken}
-								placeholderTextColor='#9CA3AF'
-								keyboardType='numeric'
-								returnKeyType='done'
-								editable={!isLoading}
-								style={{
-									textAlignVertical: 'center',
-									height: 48,
-									lineHeight: 20,
-								}}
-							/>
-							<View className='flex-row gap-3'>
-								<TouchableOpacity
-									className={`flex-1 px-6 py-3 rounded-xl ${
-										isLoading || !otpToken.trim()
-											? 'bg-gray-400'
-											: 'bg-blue-600'
-									}`}
-									style={{ height: 48 }}
-									onPress={() => handleOTPVerification(otpToken)}
-									disabled={isLoading || !otpToken.trim()}
-								>
-									<Text
-										className='font-semibold text-center text-white'
-										style={{ lineHeight: 48 }}
-									>
-										{isLoading ? 'Verifying...' : 'Verify OTP'}
-									</Text>
-								</TouchableOpacity>
-								<TouchableOpacity
-									className='px-6 bg-red-500 rounded-xl'
-									style={{ height: 48 }}
-									onPress={() => {
-										setUsedOneTimePasswordMethod(null);
-										setOtpToken('');
-									}}
-									disabled={isLoading}
-								>
-									<Text
-										className='font-semibold text-center text-white'
-										style={{ lineHeight: 48 }}
-									>
-										Cancel
-									</Text>
-								</TouchableOpacity>
-							</View>
-						</View>
-					</View>
-				</>
+				<View style={styles.otpContainer}>
+					<Text style={styles.otpTitle}>Enter Verification Code</Text>
+					<Text style={styles.otpSubtitle}>
+						We sent a 6-digit code to your{' '}
+						{usedOneTimePasswordMethod === 'email'
+							? 'email address'
+							: 'phone number'}
+					</Text>
+
+					<TextInput
+						style={styles.otpInput}
+						placeholder='000000'
+						value={otpToken}
+						onChangeText={setOtpToken}
+						placeholderTextColor='#9ca3af'
+						keyboardType='number-pad'
+						maxLength={6}
+						returnKeyType='done'
+						editable={!isLoading}
+						onSubmitEditing={() => handleOTPVerification(otpToken)}
+					/>
+
+					<TouchableOpacity
+						style={[
+							styles.otpButton,
+							(isLoading || !otpToken.trim()) && styles.buttonDisabled,
+						]}
+						onPress={() => handleOTPVerification(otpToken)}
+						disabled={isLoading || !otpToken.trim()}
+					>
+						{isLoading ? (
+							<ActivityIndicator color='#ffffff' />
+						) : (
+							<Text style={styles.buttonText}>Verify Code</Text>
+						)}
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={styles.backButton}
+						onPress={() => {
+							setUsedOneTimePasswordMethod(null);
+							setOtpToken('');
+							setEmail('');
+							setPhone('');
+						}}
+						disabled={isLoading}
+					>
+						<Text style={styles.backButtonText}>← Back to login options</Text>
+					</TouchableOpacity>
+				</View>
 			);
 		}
 
 		return (
 			<>
-				<View className='mb-8'>
-					<Text className='mb-4 text-lg font-semibold text-gray-700'>
-						Email Login
-					</Text>
-					<View className='flex-row items-center gap-3'>
-						<TextInput
-							placeholder='Enter your email'
-							value={email}
-							onChangeText={setEmail}
-							className='flex-1 px-4 py-3 text-lg bg-white border border-gray-300 rounded-lg'
-							placeholderTextColor='#9CA3AF'
-							keyboardType='email-address'
-							returnKeyType='done'
-							onSubmitEditing={() => handleEmailLogin(email)}
-							style={{
-								textAlignVertical: 'center',
-								height: 48,
-								lineHeight: 20,
-							}}
-						/>
-						<TouchableOpacity
-							className='px-6 bg-blue-600 rounded-xl'
-							style={{ height: 48 }}
-							onPress={() => handleEmailLogin(email)}
-							disabled={isLoading}
-						>
-							<Text
-								className='font-semibold text-center text-white'
-								style={{ lineHeight: 48 }}
-							>
-								{isLoading ? 'Sending...' : 'Send OTP'}
-							</Text>
-						</TouchableOpacity>
-					</View>
+				{/* Email Login - Primary Method */}
+				<View style={styles.inputContainer}>
+					<Text style={styles.sectionTitle}>Sign in with Email</Text>
+					<TextInput
+						style={styles.fullWidthInput}
+						placeholder='Enter your email address'
+						value={email}
+						onChangeText={setEmail}
+						placeholderTextColor='#9ca3af'
+						keyboardType='email-address'
+						autoCapitalize='none'
+						returnKeyType='done'
+						onSubmitEditing={() => handleEmailLogin(email)}
+					/>
+					<TouchableOpacity
+						style={[
+							styles.primaryButton,
+							(isLoading || !email.trim()) && styles.buttonDisabled,
+						]}
+						onPress={() => handleEmailLogin(email)}
+						disabled={isLoading || !email.trim()}
+					>
+						{isLoading ? (
+							<ActivityIndicator color='#ffffff' size='small' />
+						) : (
+							<>
+								<Ionicons name='mail' size={20} color='#ffffff' />
+								<Text style={styles.buttonText}>Continue with Email</Text>
+							</>
+						)}
+					</TouchableOpacity>
 				</View>
 
-				<View className='mb-8'>
-					<Text className='mb-4 text-lg font-semibold text-gray-700'>
-						SMS Login
-					</Text>
-					<View className='flex-row items-center gap-3'>
-						<TextInput
-							className='flex-1 px-4 py-3 text-lg bg-white border border-gray-300 rounded-lg'
-							placeholder='Enter your phone number'
-							value={phone}
-							onChangeText={setPhone}
-							placeholderTextColor='#9CA3AF'
-							keyboardType='phone-pad'
-							returnKeyType='done'
-							onSubmitEditing={() => handleSMSLogin(phone)}
-							style={{
-								textAlignVertical: 'center',
-								height: 48,
-								lineHeight: 20,
-							}}
-						/>
-						<TouchableOpacity
-							className='px-6 bg-blue-600 rounded-xl'
-							style={{ height: 48 }}
-							onPress={() => handleSMSLogin(phone)}
-							disabled={isLoading}
-						>
-							<Text
-								className='font-semibold text-center text-white'
-								style={{ lineHeight: 48 }}
-							>
-								{isLoading ? 'Sending...' : 'Send OTP'}
-							</Text>
-						</TouchableOpacity>
-					</View>
+				{/* Divider */}
+				<View style={styles.dividerContainer}>
+					<View style={styles.divider} />
+					<Text style={styles.dividerText}>or</Text>
+					<View style={styles.divider} />
 				</View>
+
+				{/* Phone Login - Secondary Button */}
+				<TouchableOpacity
+					style={styles.secondaryButton}
+					onPress={() => {
+						const phoneNumber = phone || '';
+						Alert.prompt(
+							'Phone Login',
+							'Enter your phone number:',
+							[
+								{ text: 'Cancel', style: 'cancel' },
+								{
+									text: 'Send OTP',
+									onPress: (inputPhone) => {
+										if (inputPhone) {
+											setPhone(inputPhone);
+											handleSMSLogin(inputPhone);
+										}
+									},
+								},
+							],
+							'plain-text',
+							phoneNumber,
+							'phone-pad'
+						);
+					}}
+					disabled={isLoading}
+				>
+					<Ionicons name='phone-portrait' size={20} color='#3b82f6' />
+					<Text style={styles.secondaryButtonText}>Continue with Phone</Text>
+				</TouchableOpacity>
 			</>
 		);
 	};
 
 	return (
-		<KeyboardAvoidingView
-			behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-			style={{ flex: 1 }}
-		>
-			<ScrollView
-				contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
-				keyboardShouldPersistTaps='handled'
-				showsVerticalScrollIndicator={false}
+		<SafeAreaView style={styles.container}>
+			<KeyboardAvoidingView
+				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				style={styles.keyboardContainer}
 			>
-				<View className='justify-center flex-1 p-5 bg-gray-50'>
-					<Text className='mb-10 text-3xl font-bold text-center text-gray-800'>
-						Welcome to SuperPay
-					</Text>
-					{renderContent()}
-				</View>
-			</ScrollView>
-		</KeyboardAvoidingView>
+				<ScrollView
+					contentContainerStyle={styles.scrollContainer}
+					keyboardShouldPersistTaps='handled'
+					showsVerticalScrollIndicator={false}
+				>
+					{/* Header */}
+					<View style={styles.header}>
+						<View style={styles.logoContainer}>
+							<Ionicons name='wallet' size={48} color='#3b82f6' />
+						</View>
+						<Text style={styles.title}>SuperPay</Text>
+						<Text style={styles.subtitle}>
+							{usedOneTimePasswordMethod
+								? 'Verify your identity'
+								: 'Sign in to your account'}
+						</Text>
+					</View>
+
+					{/* Content Card */}
+					<View style={styles.card}>{renderContent()}</View>
+
+					{/* Footer */}
+					<View style={styles.footer}>
+						<Text style={styles.footerText}>
+							Secure payments powered by blockchain technology
+						</Text>
+					</View>
+				</ScrollView>
+			</KeyboardAvoidingView>
+		</SafeAreaView>
 	);
 }
+
+const styles = StyleSheet.create({
+	container: {
+		flex: 1,
+		backgroundColor: '#f8fafc',
+	},
+	keyboardContainer: {
+		flex: 1,
+	},
+	scrollContainer: {
+		flexGrow: 1,
+		paddingHorizontal: 24,
+		paddingVertical: 32,
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		gap: 16,
+	},
+	loadingText: {
+		fontSize: 16,
+		color: '#6b7280',
+		fontWeight: '500',
+	},
+	header: {
+		alignItems: 'center',
+		marginBottom: 40,
+	},
+	logoContainer: {
+		width: 80,
+		height: 80,
+		backgroundColor: '#eff6ff',
+		borderRadius: 24,
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginBottom: 24,
+	},
+	title: {
+		fontSize: 32,
+		fontWeight: '700',
+		color: '#111827',
+		marginBottom: 8,
+	},
+	subtitle: {
+		fontSize: 16,
+		color: '#6b7280',
+		textAlign: 'center',
+		lineHeight: 24,
+	},
+	card: {
+		backgroundColor: '#ffffff',
+		borderRadius: 20,
+		padding: 32,
+		marginBottom: 32,
+		shadowColor: '#000',
+		shadowOffset: {
+			width: 0,
+			height: 4,
+		},
+		shadowOpacity: 0.1,
+		shadowRadius: 12,
+		elevation: 8,
+	},
+	footer: {
+		alignItems: 'center',
+		marginTop: 'auto',
+	},
+	footerText: {
+		fontSize: 14,
+		color: '#9ca3af',
+		textAlign: 'center',
+	},
+	// Form styles
+	sectionTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#111827',
+		marginBottom: 16,
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	inputContainer: {
+		marginBottom: 24,
+	},
+	inputWrapper: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+	},
+	input: {
+		flex: 1,
+		height: 52,
+		backgroundColor: '#f9fafb',
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		borderRadius: 12,
+		paddingHorizontal: 16,
+		fontSize: 16,
+		color: '#111827',
+	},
+	inputFocused: {
+		borderColor: '#3b82f6',
+		backgroundColor: '#ffffff',
+	},
+	button: {
+		height: 52,
+		backgroundColor: '#3b82f6',
+		borderRadius: 12,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+		minWidth: 120,
+	},
+	buttonDisabled: {
+		backgroundColor: '#9ca3af',
+	},
+	buttonText: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#ffffff',
+	},
+	// OTP styles
+	otpContainer: {
+		alignItems: 'center',
+	},
+	otpTitle: {
+		fontSize: 20,
+		fontWeight: '600',
+		color: '#111827',
+		marginBottom: 8,
+		textAlign: 'center',
+	},
+	otpSubtitle: {
+		fontSize: 16,
+		color: '#6b7280',
+		textAlign: 'center',
+		marginBottom: 32,
+		lineHeight: 24,
+	},
+	otpInput: {
+		width: '100%',
+		height: 52,
+		backgroundColor: '#f9fafb',
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		borderRadius: 12,
+		paddingHorizontal: 16,
+		fontSize: 18,
+		textAlign: 'center',
+		letterSpacing: 8,
+		marginBottom: 24,
+		color: '#111827',
+	},
+	otpButton: {
+		width: '100%',
+		height: 52,
+		backgroundColor: '#3b82f6',
+		borderRadius: 12,
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginBottom: 16,
+	},
+	backButton: {
+		width: '100%',
+		height: 48,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	backButtonText: {
+		fontSize: 16,
+		color: '#6b7280',
+		fontWeight: '500',
+	},
+	// Updated divider styles
+	dividerContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginVertical: 24,
+	},
+	divider: {
+		flex: 1,
+		height: 1,
+		backgroundColor: '#e5e7eb',
+	},
+	dividerText: {
+		fontSize: 14,
+		color: '#9ca3af',
+		marginHorizontal: 16,
+		fontWeight: '500',
+	},
+	// New input and button styles
+	fullWidthInput: {
+		width: '100%',
+		height: 52,
+		backgroundColor: '#f9fafb',
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		borderRadius: 12,
+		paddingHorizontal: 16,
+		fontSize: 16,
+		color: '#111827',
+		marginBottom: 16,
+	},
+	primaryButton: {
+		width: '100%',
+		height: 52,
+		backgroundColor: '#3b82f6',
+		borderRadius: 12,
+		justifyContent: 'center',
+		alignItems: 'center',
+		flexDirection: 'row',
+		gap: 8,
+	},
+	secondaryButton: {
+		width: '100%',
+		height: 52,
+		backgroundColor: 'transparent',
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		borderRadius: 12,
+		justifyContent: 'center',
+		alignItems: 'center',
+		flexDirection: 'row',
+		gap: 8,
+	},
+	secondaryButtonText: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#374151',
+	},
+});

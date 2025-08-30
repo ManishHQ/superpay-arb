@@ -397,4 +397,276 @@ export class TransactionService {
 			throw error;
 		}
 	}
+
+	/**
+	 * Get spending analytics for track page
+	 */
+	static async getSpendingAnalytics(timeFrame: 'week' | 'month' = 'week') {
+		try {
+			const walletAddress = useWalletStore.getState().address;
+			if (!walletAddress) {
+				throw new Error('No wallet connected');
+			}
+
+			const userProfile =
+				await this.getUserProfileByWalletAddress(walletAddress);
+			if (!userProfile) {
+				throw new Error('User profile not found for wallet address');
+			}
+
+			// Calculate date range
+			const now = new Date();
+			const startDate = new Date();
+			if (timeFrame === 'week') {
+				startDate.setDate(now.getDate() - 7);
+			} else {
+				startDate.setMonth(now.getMonth() - 1);
+			}
+
+			// Get transactions in the time range
+			const { data: transactions, error } = await supabase
+				.from('transactions')
+				.select(
+					'amount, category, currency, created_at, to_user:user_profiles!transactions_to_user_id_fkey(username, full_name)'
+				)
+				.eq('from_user_id', userProfile.id)
+				.eq('status', 'completed')
+				.gte('created_at', startDate.toISOString())
+				.lte('created_at', now.toISOString())
+				.order('created_at', { ascending: false });
+
+			if (error) {
+				console.error('Error fetching analytics data:', error);
+				throw new Error(`Failed to fetch analytics data: ${error.message}`);
+			}
+
+			// Process spending by category
+			const categorySpending: Record<
+				string,
+				{ amount: number; count: number }
+			> = {};
+			let totalSpending = 0;
+
+			transactions?.forEach((transaction) => {
+				if (transaction.currency === 'USDC') {
+					totalSpending += transaction.amount;
+
+					const category = transaction.category || 'other';
+					if (!categorySpending[category]) {
+						categorySpending[category] = { amount: 0, count: 0 };
+					}
+					categorySpending[category].amount += transaction.amount;
+					categorySpending[category].count += 1;
+				}
+			});
+
+			// Convert to chart format
+			const categoryData = Object.entries(categorySpending)
+				.map(([category, data]) => ({
+					id: category,
+					name: this.getCategoryDisplayName(category as TransactionCategory),
+					amount: data.amount,
+					percentage:
+						totalSpending > 0
+							? Math.round((data.amount / totalSpending) * 100)
+							: 0,
+					color: this.getCategoryColor(category as TransactionCategory),
+					icon: this.getCategoryIcon(category as TransactionCategory),
+					value:
+						totalSpending > 0
+							? Math.round((data.amount / totalSpending) * 100)
+							: 0,
+				}))
+				.filter((item) => item.amount > 0)
+				.sort((a, b) => b.amount - a.amount);
+
+			// Get recent transactions (last 10)
+			const recentTransactions =
+				transactions?.slice(0, 10).map((transaction, index) => ({
+					id: transaction.id || index.toString(),
+					name:
+						transaction.to_user?.full_name ||
+						transaction.to_user?.username ||
+						'Unknown',
+					amount: transaction.amount,
+					category: this.getCategoryDisplayName(
+						transaction.category as TransactionCategory
+					),
+					time: this.formatTimeAgo(new Date(transaction.created_at)),
+					icon: this.getCategoryIcon(
+						transaction.category as TransactionCategory
+					),
+				})) || [];
+
+			return {
+				categoryData,
+				recentTransactions,
+				totalSpending,
+				transactionCount: transactions?.length || 0,
+			};
+		} catch (error) {
+			console.error('Error in getSpendingAnalytics:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Get daily/weekly spending data for charts
+	 */
+	static async getTimeSeriesData(timeFrame: 'week' | 'month' = 'week') {
+		try {
+			const walletAddress = useWalletStore.getState().address;
+			if (!walletAddress) {
+				throw new Error('No wallet connected');
+			}
+
+			const userProfile =
+				await this.getUserProfileByWalletAddress(walletAddress);
+			if (!userProfile) {
+				throw new Error('User profile not found for wallet address');
+			}
+
+			const now = new Date();
+			const startDate = new Date();
+			const periods: string[] = [];
+
+			if (timeFrame === 'week') {
+				startDate.setDate(now.getDate() - 7);
+				// Generate last 7 days
+				for (let i = 6; i >= 0; i--) {
+					const date = new Date();
+					date.setDate(now.getDate() - i);
+					periods.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
+				}
+			} else {
+				startDate.setMonth(now.getMonth() - 12);
+				// Generate last 12 months
+				for (let i = 11; i >= 0; i--) {
+					const date = new Date();
+					date.setMonth(now.getMonth() - i);
+					periods.push(date.toLocaleDateString('en-US', { month: 'short' }));
+				}
+			}
+
+			const { data: transactions, error } = await supabase
+				.from('transactions')
+				.select('amount, currency, created_at')
+				.eq('from_user_id', userProfile.id)
+				.eq('status', 'completed')
+				.gte('created_at', startDate.toISOString())
+				.lte('created_at', now.toISOString());
+
+			if (error) {
+				console.error('Error fetching time series data:', error);
+				throw new Error(`Failed to fetch time series data: ${error.message}`);
+			}
+
+			// Group transactions by time period
+			const spendingByPeriod: Record<string, number> = {};
+			periods.forEach((period) => {
+				spendingByPeriod[period] = 0;
+			});
+
+			transactions?.forEach((transaction) => {
+				if (transaction.currency === 'USDC') {
+					const date = new Date(transaction.created_at);
+					const period =
+						timeFrame === 'week'
+							? date.toLocaleDateString('en-US', { weekday: 'short' })
+							: date.toLocaleDateString('en-US', { month: 'short' });
+
+					if (spendingByPeriod[period] !== undefined) {
+						spendingByPeriod[period] += transaction.amount;
+					}
+				}
+			});
+
+			// Convert to chart format with mock yield data (since we don't have yield transactions yet)
+			const chartData = periods.map((period) => ({
+				spending: spendingByPeriod[period] || 0,
+				yield: (spendingByPeriod[period] || 0) * 0.1, // Mock 10% yield
+				net:
+					(spendingByPeriod[period] || 0) * 0.1 -
+					(spendingByPeriod[period] || 0),
+				label: period,
+			}));
+
+			return chartData;
+		} catch (error) {
+			console.error('Error in getTimeSeriesData:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Helper methods for category display
+	 */
+	private static getCategoryDisplayName(category: TransactionCategory): string {
+		const displayNames: Record<TransactionCategory, string> = {
+			food: 'Food & Dining',
+			transport: 'Transportation',
+			shopping: 'Shopping',
+			entertainment: 'Entertainment',
+			utilities: 'Utilities',
+			housing: 'Housing',
+			healthcare: 'Healthcare',
+			emergency: 'Emergency',
+			vacation: 'Vacation',
+			investment: 'Investment',
+			custom: 'Custom',
+			other: 'Other',
+		};
+		return displayNames[category] || 'Other';
+	}
+
+	private static getCategoryColor(category: TransactionCategory): string {
+		const colors: Record<TransactionCategory, string> = {
+			food: '#FF6B6B',
+			transport: '#4ECDC4',
+			shopping: '#45B7D1',
+			entertainment: '#96CEB4',
+			utilities: '#FFEAA7',
+			housing: '#DDA0DD',
+			healthcare: '#98D8C8',
+			emergency: '#F7DC6F',
+			vacation: '#BB8FCE',
+			investment: '#85C1E9',
+			custom: '#F8C471',
+			other: '#AED6F1',
+		};
+		return colors[category] || '#AED6F1';
+	}
+
+	private static getCategoryIcon(category: TransactionCategory): string {
+		const icons: Record<TransactionCategory, string> = {
+			food: '🍕',
+			transport: '🚗',
+			shopping: '🛍️',
+			entertainment: '🎬',
+			utilities: '⚡',
+			housing: '🏠',
+			healthcare: '🏥',
+			emergency: '🚨',
+			vacation: '✈️',
+			investment: '📈',
+			custom: '⭐',
+			other: '📝',
+		};
+		return icons[category] || '📝';
+	}
+
+	private static formatTimeAgo(date: Date): string {
+		const now = new Date();
+		const diff = now.getTime() - date.getTime();
+		const hours = Math.floor(diff / (1000 * 60 * 60));
+		const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+		if (days > 0) {
+			return `${days} day${days > 1 ? 's' : ''} ago`;
+		} else if (hours > 0) {
+			return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+		} else {
+			return 'Just now';
+		}
+	}
 }
