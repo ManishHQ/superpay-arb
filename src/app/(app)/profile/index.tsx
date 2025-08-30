@@ -351,6 +351,133 @@ export default function ProfileScreen() {
 					</View>
 				</LinearGradient>
 
+				{/* SuperPay Card Section */}
+				<View className='mb-6'>
+					<View className='relative'>
+						{/* Card Container */}
+						<LinearGradient
+							colors={['#1e3a8a', '#3b82f6', '#6366f1']}
+							start={{ x: 0, y: 0 }}
+							end={{ x: 1, y: 1 }}
+							className='p-6 rounded-2xl shadow-lg'
+							style={{
+								shadowColor: '#000',
+								shadowOffset: { width: 0, height: 8 },
+								shadowOpacity: 0.3,
+								shadowRadius: 12,
+								elevation: 12,
+							}}
+						>
+							{/* Card Background Pattern */}
+							<View className='absolute top-0 right-0 opacity-10'>
+								<View className='w-32 h-32 bg-white rounded-full -mr-16 -mt-16' />
+							</View>
+							<View className='absolute bottom-0 left-0 opacity-5'>
+								<View className='w-24 h-24 bg-white rounded-full -ml-12 -mb-12' />
+							</View>
+
+							{/* Card Header */}
+							<View className='flex-row justify-between items-start mb-8'>
+								<View>
+									<Text className='text-white text-lg font-semibold opacity-90'>
+										SuperPay Card
+									</Text>
+									<Text className='text-white text-sm opacity-70'>
+										Digital Payments
+									</Text>
+								</View>
+								<View className='bg-white bg-opacity-20 rounded-lg px-3 py-1'>
+									<Text className='text-white text-xs font-bold'>VISA</Text>
+								</View>
+							</View>
+
+							{/* Card Number */}
+							<View className='mb-6'>
+								<Text className='text-white text-xl font-mono tracking-wider'>
+									•••• •••• •••• ••••
+								</Text>
+							</View>
+
+							{/* Card Details */}
+							<View className='flex-row justify-between items-end'>
+								<View>
+									<Text className='text-white text-xs opacity-70 mb-1'>
+										CARDHOLDER NAME
+									</Text>
+									<Text className='text-white text-base font-semibold'>
+										{userData.fullName.toUpperCase()}
+									</Text>
+								</View>
+								<View className='items-end'>
+									<Text className='text-white text-xs opacity-70 mb-1'>
+										VALID THRU
+									</Text>
+									<Text className='text-white text-base font-semibold'>
+										••/••
+									</Text>
+								</View>
+							</View>
+
+							{/* Coming Soon Overlay */}
+							<View className='absolute inset-0 bg-black bg-opacity-40 rounded-2xl flex-1 justify-center items-center'>
+								<View className='bg-white bg-opacity-20 backdrop-blur-sm rounded-xl px-6 py-3'>
+									<Text className='text-white text-lg font-bold text-center'>
+										Coming Soon
+									</Text>
+									<Text className='text-white text-sm opacity-90 text-center mt-1'>
+										Physical & Virtual Cards
+									</Text>
+								</View>
+							</View>
+						</LinearGradient>
+
+						{/* Card Features */}
+						<View className='mt-4 px-4'>
+							<Text className='text-gray-600 text-sm text-center mb-3'>
+								Get ready for the future of payments
+							</Text>
+							<View className='flex-row justify-around'>
+								<View className='items-center'>
+									<View className='w-10 h-10 bg-blue-100 rounded-full items-center justify-center mb-2'>
+										<Ionicons name='card' size={20} color='#3b82f6' />
+									</View>
+									<Text className='text-xs text-gray-600 text-center'>
+										Contactless{'\n'}Payments
+									</Text>
+								</View>
+								<View className='items-center'>
+									<View className='w-10 h-10 bg-green-100 rounded-full items-center justify-center mb-2'>
+										<Ionicons
+											name='shield-checkmark'
+											size={20}
+											color='#10b981'
+										/>
+									</View>
+									<Text className='text-xs text-gray-600 text-center'>
+										Secure{'\n'}Transactions
+									</Text>
+								</View>
+								<View className='items-center'>
+									<View className='w-10 h-10 bg-purple-100 rounded-full items-center justify-center mb-2'>
+										<Ionicons name='globe' size={20} color='#8b5cf6' />
+									</View>
+									<Text className='text-xs text-gray-600 text-center'>
+										Global{'\n'}Acceptance
+									</Text>
+								</View>
+								<View className='items-center'>
+									<View className='w-10 h-10 bg-orange-100 rounded-full items-center justify-center mb-2'>
+										<Ionicons name='flash' size={20} color='#f59e0b' />
+									</View>
+									<Text className='text-xs text-gray-600 text-center'>
+										Instant{'\n'}Rewards
+									</Text>
+								</View>
+							</View>
+						</View>
+					</View>
+				</View>
+
 				{/* Primary Actions Section */}
 				<View className='p-8 mb-6 bg-white shadow-sm rounded-2xl'>
 					<Text className='mb-6 text-xl font-semibold text-gray-900'>

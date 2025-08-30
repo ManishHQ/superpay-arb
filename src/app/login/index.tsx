@@ -13,11 +13,15 @@ import {
 	Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { dynamicClient } from '@/lib/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useReactiveClient } from '@dynamic-labs/react-hooks';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { OnboardingModal } from '@/components';
+import { AuthService } from '@/services/authService';
+import { useUserProfileStore } from '@/stores/userProfileStore';
 
 const { width } = Dimensions.get('window');
 
@@ -29,19 +33,126 @@ export default function LoginPage() {
 	const [phone, setPhone] = useState('');
 	const [otpToken, setOtpToken] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
-	const { auth, sdk } = useReactiveClient(dynamicClient);
+	const [showOnboarding, setShowOnboarding] = useState(false);
+	const [onboardingData, setOnboardingData] = useState<any>(null);
 
-	// All hooks must be called before any conditional returns
+	const { auth, sdk, wallets } = useReactiveClient(dynamicClient);
+	const { setCurrentProfile } = useUserProfileStore();
+
+	// Check if user is already authenticated
 	useEffect(() => {
-		if (auth.token && sdk.loaded) {
-			router.replace('/');
-		}
-	}, [auth.token, sdk.loaded]);
+		const checkExistingAuth = async () => {
+			if (auth.token && sdk.loaded && wallets.userWallets?.length > 0) {
+				console.log('User already authenticated, processing...');
+				await handleAuthenticationSuccess();
+			}
+		};
 
-	// Conditional rendering after all hooks
+		checkExistingAuth();
+	}, [auth.token, sdk.loaded, wallets.userWallets]);
+
+	// Handle successful Dynamic authentication
+	const handleAuthenticationSuccess = async () => {
+		try {
+			setIsLoading(true);
+			console.log('Processing authentication success...');
+
+			// Check database and handle onboarding
+			const authFlow = await AuthService.handleAuthenticationFlow(
+				auth,
+				wallets
+			);
+			console.log('Auth flow result:', authFlow);
+
+			if (authFlow.success) {
+				if (authFlow.needsOnboarding) {
+					// User needs onboarding
+					console.log('User needs onboarding, setting up modal');
+					const authUser = AuthService.extractUserFromDynamic(auth, wallets);
+					if (authUser) {
+						const onboardingInfo = {
+							fullName:
+								authUser.fullName ||
+								authUser.firstName ||
+								authUser.lastName ||
+								'',
+							username: authUser.username || `user_${Date.now()}`,
+							email: authUser.email || '',
+							walletAddress: authUser.walletAddress || '',
+						};
+						console.log('Setting onboarding data:', onboardingInfo);
+						setOnboardingData(onboardingInfo);
+						setShowOnboarding(true);
+					} else {
+						console.error('Failed to extract user data for onboarding');
+						Alert.alert(
+							'Error',
+							'Failed to extract user information. Please try again.'
+						);
+					}
+				} else if (authFlow.userProfile) {
+					// User exists in database, set profile and navigate
+					console.log('User profile found, logging in');
+					setCurrentProfile(authFlow.userProfile);
+
+					// Navigate based on role
+					if (authFlow.userProfile.role === 'business') {
+						router.replace('/business/home');
+					} else {
+						router.replace('/(app)/home');
+					}
+				} else {
+					console.error(
+						'Auth flow success but no profile and no onboarding needed - unexpected state'
+					);
+					Alert.alert(
+						'Error',
+						'Authentication completed but user profile is missing. Please contact support.'
+					);
+				}
+			} else {
+				console.error('Auth flow failed:', authFlow.error);
+				Alert.alert(
+					'Authentication Error',
+					authFlow.error ||
+						'Failed to complete authentication. Please try again.'
+				);
+			}
+		} catch (error) {
+			console.error('Error handling authentication success:', error);
+			Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	// Handle onboarding completion
+	const handleOnboardingComplete = (profile: any) => {
+		console.log('Onboarding completed:', profile);
+		setCurrentProfile(profile);
+		setShowOnboarding(false);
+
+		// Navigate based on role
+		if (profile.role === 'business') {
+			router.replace('/business/home');
+		} else {
+			router.replace('/(app)/home');
+		}
+	};
+
+	// Handle onboarding cancellation
+	const handleOnboardingCancel = () => {
+		console.log('Onboarding cancelled, logging out');
+		setShowOnboarding(false);
+		dynamicClient.auth.logout();
+		setOnboardingData(null);
+	};
+
+	// Show loading while SDK initializes
 	if (!sdk.loaded) {
 		return (
 			<SafeAreaView style={styles.container}>
+				<StatusBar style='dark' backgroundColor='#F8FAFC' />
 				<View style={styles.loadingContainer}>
 					<ActivityIndicator size='large' color='#3b82f6' />
 					<Text style={styles.loadingText}>Initializing SuperPay...</Text>
@@ -50,11 +161,26 @@ export default function LoginPage() {
 		);
 	}
 
+	// Show onboarding modal if needed
+	if (showOnboarding) {
+		return (
+			<>
+				<StatusBar style='dark' backgroundColor='#F8FAFC' />
+				<OnboardingModal
+					visible={showOnboarding}
+					initialData={onboardingData}
+					onComplete={handleOnboardingComplete}
+					onCancel={handleOnboardingCancel}
+				/>
+			</>
+		);
+	}
+
 	const storeAuthToken = async (token: string) => {
 		try {
 			await AsyncStorage.setItem('authToken', token);
 			console.log('Auth token stored successfully');
-			router.replace('/');
+			await handleAuthenticationSuccess();
 		} catch (error) {
 			console.error('Error storing auth token:', error);
 		}
@@ -143,50 +269,40 @@ export default function LoginPage() {
 				.verifyOTP(token)
 				.then((response: any) => {
 					console.log('Email OTP verification successful:', response);
-					// Store the authentication token
 					if (response?.token) {
 						storeAuthToken(response.token);
 					} else {
-						// If no token in response, create a mock one for demo
-						storeAuthToken(`email_${Date.now()}`);
+						// Authentication successful, handle it
+						handleAuthenticationSuccess();
 					}
-					setIsLoading(false);
-					Alert.alert('Success', 'Email verified successfully!', [
-						{
-							text: 'Continue',
-							onPress: () => router.replace('/'),
-						},
-					]);
 				})
 				.catch((error: any) => {
 					console.error('Email OTP verification error:', error);
 					setIsLoading(false);
-					Alert.alert('Error', 'Invalid OTP. Please try again.');
+					Alert.alert(
+						'Error',
+						`OTP verification failed: ${error?.message || 'Invalid OTP'}`
+					);
 				});
 		} else if (usedOneTimePasswordMethod === 'sms') {
 			dynamicClient.auth.sms
 				.verifyOTP(token)
 				.then((response: any) => {
 					console.log('SMS OTP verification successful:', response);
-					// Store the authentication token
 					if (response?.token) {
 						storeAuthToken(response.token);
 					} else {
-						// If no token in response, create a mock one for demo
-						storeAuthToken(`sms_${Date.now()}`);
+						// Authentication successful, handle it
+						handleAuthenticationSuccess();
 					}
-					setIsLoading(false);
-					Alert.alert('Success', 'Phone verified successfully!', [
-						{
-							text: 'Continue',
-							onPress: () => router.replace('/'),
-						},
-					]);
 				})
 				.catch((error: any) => {
 					console.error('SMS OTP verification error:', error);
 					setIsLoading(false);
-					Alert.alert('Error', 'Invalid OTP. Please try again.');
+					Alert.alert(
+						'Error',
+						`OTP verification failed: ${error?.message || 'Invalid OTP'}`
+					);
 				});
 		}
 	};
@@ -195,7 +311,7 @@ export default function LoginPage() {
 		if (usedOneTimePasswordMethod !== null) {
 			return (
 				<View style={styles.otpContainer}>
-					<Text style={styles.otpTitle}>Enter Verification Code</Text>
+					<Text style={styles.otpTitle}>Verify your code</Text>
 					<Text style={styles.otpSubtitle}>
 						We sent a 6-digit code to your{' '}
 						{usedOneTimePasswordMethod === 'email'
@@ -205,14 +321,14 @@ export default function LoginPage() {
 
 					<TextInput
 						style={styles.otpInput}
-						placeholder='000000'
+						placeholder={isLoading ? 'Verifying...' : 'Enter OTP'}
 						value={otpToken}
 						onChangeText={setOtpToken}
 						placeholderTextColor='#9ca3af'
-						keyboardType='number-pad'
-						maxLength={6}
+						keyboardType='numeric'
 						returnKeyType='done'
 						editable={!isLoading}
+						maxLength={6}
 						onSubmitEditing={() => handleOTPVerification(otpToken)}
 					/>
 
@@ -236,12 +352,10 @@ export default function LoginPage() {
 						onPress={() => {
 							setUsedOneTimePasswordMethod(null);
 							setOtpToken('');
-							setEmail('');
-							setPhone('');
 						}}
 						disabled={isLoading}
 					>
-						<Text style={styles.backButtonText}>← Back to login options</Text>
+						<Text style={styles.backButtonText}>Back to Login</Text>
 					</TouchableOpacity>
 				</View>
 			);
@@ -325,35 +439,36 @@ export default function LoginPage() {
 
 	return (
 		<SafeAreaView style={styles.container}>
+			<StatusBar style='dark' backgroundColor='#F8FAFC' />
 			<KeyboardAvoidingView
+				style={styles.container}
 				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-				style={styles.keyboardContainer}
 			>
 				<ScrollView
 					contentContainerStyle={styles.scrollContainer}
 					keyboardShouldPersistTaps='handled'
-					showsVerticalScrollIndicator={false}
 				>
 					{/* Header */}
 					<View style={styles.header}>
 						<View style={styles.logoContainer}>
-							<Ionicons name='wallet' size={48} color='#3b82f6' />
+							<Ionicons name='wallet' size={32} color='#3b82f6' />
+							<Text style={styles.title}>SuperPay</Text>
 						</View>
-						<Text style={styles.title}>SuperPay</Text>
 						<Text style={styles.subtitle}>
 							{usedOneTimePasswordMethod
-								? 'Verify your identity'
-								: 'Sign in to your account'}
+								? 'Almost there!'
+								: 'Welcome back to your digital wallet'}
 						</Text>
 					</View>
 
-					{/* Content Card */}
+					{/* Main Content Card */}
 					<View style={styles.card}>{renderContent()}</View>
 
 					{/* Footer */}
 					<View style={styles.footer}>
 						<Text style={styles.footerText}>
-							Secure payments powered by blockchain technology
+							By continuing, you agree to SuperPay's Terms of Service and
+							Privacy Policy
 						</Text>
 					</View>
 				</ScrollView>
@@ -365,57 +480,50 @@ export default function LoginPage() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#f8fafc',
-	},
-	keyboardContainer: {
-		flex: 1,
-	},
-	scrollContainer: {
-		flexGrow: 1,
-		paddingHorizontal: 24,
-		paddingVertical: 32,
+		backgroundColor: '#F8FAFC',
 	},
 	loadingContainer: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
-		gap: 16,
+		backgroundColor: '#F8FAFC',
 	},
 	loadingText: {
+		marginTop: 16,
 		fontSize: 16,
-		color: '#6b7280',
+		color: '#6B7280',
 		fontWeight: '500',
+	},
+	scrollContainer: {
+		flexGrow: 1,
+		justifyContent: 'center',
+		padding: 24,
 	},
 	header: {
 		alignItems: 'center',
-		marginBottom: 40,
+		marginBottom: 32,
 	},
 	logoContainer: {
-		width: 80,
-		height: 80,
-		backgroundColor: '#eff6ff',
-		borderRadius: 24,
-		justifyContent: 'center',
+		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 24,
+		marginBottom: 16,
 	},
 	title: {
 		fontSize: 32,
-		fontWeight: '700',
-		color: '#111827',
-		marginBottom: 8,
+		fontWeight: 'bold',
+		color: '#1F2937',
+		marginLeft: 12,
 	},
 	subtitle: {
 		fontSize: 16,
-		color: '#6b7280',
+		color: '#6B7280',
 		textAlign: 'center',
 		lineHeight: 24,
 	},
 	card: {
-		backgroundColor: '#ffffff',
-		borderRadius: 20,
+		backgroundColor: '#FFFFFF',
+		borderRadius: 24,
 		padding: 32,
-		marginBottom: 32,
 		shadowColor: '#000',
 		shadowOffset: {
 			width: 0,
@@ -424,118 +532,72 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.1,
 		shadowRadius: 12,
 		elevation: 8,
-	},
-	footer: {
-		alignItems: 'center',
-		marginTop: 'auto',
-	},
-	footerText: {
-		fontSize: 14,
-		color: '#9ca3af',
-		textAlign: 'center',
-	},
-	// Form styles
-	sectionTitle: {
-		fontSize: 18,
-		fontWeight: '600',
-		color: '#111827',
-		marginBottom: 16,
-		flexDirection: 'row',
-		alignItems: 'center',
+		marginBottom: 24,
 	},
 	inputContainer: {
 		marginBottom: 24,
 	},
-	inputWrapper: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-	},
-	input: {
-		flex: 1,
-		height: 52,
-		backgroundColor: '#f9fafb',
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		borderRadius: 12,
-		paddingHorizontal: 16,
-		fontSize: 16,
-		color: '#111827',
-	},
-	inputFocused: {
-		borderColor: '#3b82f6',
-		backgroundColor: '#ffffff',
-	},
-	button: {
-		height: 52,
-		backgroundColor: '#3b82f6',
-		borderRadius: 12,
-		justifyContent: 'center',
-		alignItems: 'center',
-		paddingHorizontal: 24,
-		minWidth: 120,
-	},
-	buttonDisabled: {
-		backgroundColor: '#9ca3af',
-	},
-	buttonText: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#ffffff',
-	},
-	// OTP styles
-	otpContainer: {
-		alignItems: 'center',
-	},
-	otpTitle: {
-		fontSize: 20,
-		fontWeight: '600',
-		color: '#111827',
-		marginBottom: 8,
-		textAlign: 'center',
-	},
-	otpSubtitle: {
-		fontSize: 16,
-		color: '#6b7280',
-		textAlign: 'center',
-		marginBottom: 32,
-		lineHeight: 24,
-	},
-	otpInput: {
-		width: '100%',
-		height: 52,
-		backgroundColor: '#f9fafb',
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		borderRadius: 12,
-		paddingHorizontal: 16,
+	sectionTitle: {
 		fontSize: 18,
+		fontWeight: '600',
+		color: '#1F2937',
+		marginBottom: 16,
 		textAlign: 'center',
-		letterSpacing: 8,
-		marginBottom: 24,
-		color: '#111827',
 	},
-	otpButton: {
-		width: '100%',
-		height: 52,
-		backgroundColor: '#3b82f6',
-		borderRadius: 12,
-		justifyContent: 'center',
-		alignItems: 'center',
+	fullWidthInput: {
+		backgroundColor: '#F9FAFB',
+		borderWidth: 2,
+		borderColor: '#E5E7EB',
+		borderRadius: 16,
+		paddingHorizontal: 20,
+		paddingVertical: 16,
+		fontSize: 16,
+		color: '#1F2937',
 		marginBottom: 16,
 	},
-	backButton: {
-		width: '100%',
-		height: 48,
-		justifyContent: 'center',
+	primaryButton: {
+		backgroundColor: '#3B82F6',
+		borderRadius: 16,
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		flexDirection: 'row',
 		alignItems: 'center',
+		justifyContent: 'center',
+		shadowColor: '#3B82F6',
+		shadowOffset: {
+			width: 0,
+			height: 4,
+		},
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		elevation: 8,
 	},
-	backButtonText: {
+	secondaryButton: {
+		backgroundColor: '#FFFFFF',
+		borderWidth: 2,
+		borderColor: '#E5E7EB',
+		borderRadius: 16,
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	secondaryButtonText: {
+		color: '#3B82F6',
 		fontSize: 16,
-		color: '#6b7280',
-		fontWeight: '500',
+		fontWeight: '600',
+		marginLeft: 8,
 	},
-	// Updated divider styles
+	buttonText: {
+		color: '#FFFFFF',
+		fontSize: 16,
+		fontWeight: '600',
+		marginLeft: 8,
+	},
+	buttonDisabled: {
+		opacity: 0.6,
+	},
 	dividerContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -544,52 +606,81 @@ const styles = StyleSheet.create({
 	divider: {
 		flex: 1,
 		height: 1,
-		backgroundColor: '#e5e7eb',
+		backgroundColor: '#E5E7EB',
 	},
 	dividerText: {
-		fontSize: 14,
-		color: '#9ca3af',
 		marginHorizontal: 16,
+		fontSize: 14,
+		color: '#9CA3AF',
 		fontWeight: '500',
 	},
-	// New input and button styles
-	fullWidthInput: {
-		width: '100%',
-		height: 52,
-		backgroundColor: '#f9fafb',
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		borderRadius: 12,
-		paddingHorizontal: 16,
+	otpContainer: {
+		alignItems: 'center',
+	},
+	otpTitle: {
+		fontSize: 24,
+		fontWeight: 'bold',
+		color: '#1F2937',
+		marginBottom: 8,
+		textAlign: 'center',
+	},
+	otpSubtitle: {
 		fontSize: 16,
-		color: '#111827',
+		color: '#6B7280',
+		textAlign: 'center',
+		marginBottom: 32,
+		lineHeight: 24,
+	},
+	otpInput: {
+		backgroundColor: '#F9FAFB',
+		borderWidth: 2,
+		borderColor: '#E5E7EB',
+		borderRadius: 16,
+		paddingHorizontal: 20,
+		paddingVertical: 16,
+		fontSize: 24,
+		color: '#1F2937',
+		textAlign: 'center',
+		letterSpacing: 8,
+		fontWeight: 'bold',
+		width: '100%',
+		marginBottom: 24,
+	},
+	otpButton: {
+		backgroundColor: '#3B82F6',
+		borderRadius: 16,
+		paddingVertical: 16,
+		paddingHorizontal: 32,
+		width: '100%',
+		alignItems: 'center',
 		marginBottom: 16,
+		shadowColor: '#3B82F6',
+		shadowOffset: {
+			width: 0,
+			height: 4,
+		},
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		elevation: 8,
 	},
-	primaryButton: {
-		width: '100%',
-		height: 52,
-		backgroundColor: '#3b82f6',
-		borderRadius: 12,
-		justifyContent: 'center',
-		alignItems: 'center',
-		flexDirection: 'row',
-		gap: 8,
+	backButton: {
+		paddingVertical: 12,
+		paddingHorizontal: 24,
 	},
-	secondaryButton: {
-		width: '100%',
-		height: 52,
-		backgroundColor: 'transparent',
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		borderRadius: 12,
-		justifyContent: 'center',
-		alignItems: 'center',
-		flexDirection: 'row',
-		gap: 8,
-	},
-	secondaryButtonText: {
+	backButtonText: {
+		color: '#6B7280',
 		fontSize: 16,
-		fontWeight: '600',
-		color: '#374151',
+		fontWeight: '500',
+		textAlign: 'center',
+	},
+	footer: {
+		alignItems: 'center',
+		paddingHorizontal: 16,
+	},
+	footerText: {
+		fontSize: 12,
+		color: '#9CA3AF',
+		textAlign: 'center',
+		lineHeight: 18,
 	},
 });
