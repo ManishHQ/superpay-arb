@@ -17,6 +17,10 @@ import { UserProfileService } from '@/services/userProfileService';
 import { AvatarService } from '@/services/avatarService';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'react-native';
+import { useReactiveClient } from '@dynamic-labs/react-hooks';
+import { dynamicClient } from '@/lib/client';
+import { useWalletStore } from '@/stores/walletStore';
+import { router } from 'expo-router';
 
 const styles = StyleSheet.create({
 	container: {
@@ -178,6 +182,23 @@ const styles = StyleSheet.create({
 		color: '#6b7280',
 		marginTop: 12,
 	},
+	logoutButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#fef2f2',
+		borderWidth: 1,
+		borderColor: '#fecaca',
+		paddingHorizontal: 24,
+		paddingVertical: 16,
+		borderRadius: 12,
+		gap: 8,
+	},
+	logoutButtonText: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#dc2626',
+	},
 });
 
 const businessTypes = [
@@ -194,10 +215,14 @@ const businessTypes = [
 ];
 
 export default function BusinessSettings() {
+	// Dynamic client and wallet state
+	const { auth } = useReactiveClient(dynamicClient);
+
 	const {
 		currentProfile,
 		setCurrentProfile,
 		isLoading: profileLoading,
+		clearProfile,
 	} = useUserProfileStore();
 	const [isLoading, setIsLoading] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
@@ -313,6 +338,28 @@ export default function BusinessSettings() {
 			);
 		} finally {
 			setIsSaving(false);
+		}
+	};
+
+	const handleLogout = async () => {
+		try {
+			// Clear profile and wallet state first
+			clearProfile();
+			useWalletStore.getState().reset();
+
+			// Logout from Dynamic (handle async properly)
+			if (auth.authenticatedUser) {
+				await auth.logout();
+			}
+
+			// Navigate to login screen
+			router.replace('/login');
+		} catch (error) {
+			console.error('Logout error:', error);
+			// Still clear local state and redirect even if logout fails
+			clearProfile();
+			useWalletStore.getState().reset();
+			router.replace('/login');
 		}
 	};
 
@@ -707,6 +754,22 @@ export default function BusinessSettings() {
 								Your name as the business owner
 							</Text>
 						</View>
+					</View>
+
+					{/* Add some bottom padding for the last section */}
+					<View style={{ height: 40 }} />
+
+					{/* Account Management Section */}
+					<View style={styles.section}>
+						<Text style={styles.sectionTitle}>Account</Text>
+
+						<TouchableOpacity
+							style={[styles.logoutButton]}
+							onPress={handleLogout}
+						>
+							<Ionicons name='log-out-outline' size={20} color='#dc2626' />
+							<Text style={styles.logoutButtonText}>Sign Out</Text>
+						</TouchableOpacity>
 					</View>
 
 					{/* Add some bottom padding for the last section */}

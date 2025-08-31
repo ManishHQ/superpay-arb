@@ -11,6 +11,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { router } from 'expo-router';
 
 interface WaitlistEntry {
 	id: string;
@@ -473,6 +474,15 @@ export default function WaitlistPage() {
 									Join the Waitlist
 								</Text>
 							)}
+						</TouchableOpacity>
+
+						<TouchableOpacity
+							onPress={() => {
+								router.push('/login');
+							}}
+							className='items-center py-4'
+						>
+							<Text className='text-lg font-bold text-blue'>Try the demo</Text>
 						</TouchableOpacity>
 
 						{/* Social Proof */}
