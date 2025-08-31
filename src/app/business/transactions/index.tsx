@@ -68,7 +68,6 @@ export default function BusinessTransactions() {
 				currentProfile.id
 			);
 			console.log('✅ Loaded transactions:', userTransactions.length);
-			console.log('📋 Transaction data sample:', userTransactions[0]);
 
 			setTransactions(userTransactions);
 			calculateStats(userTransactions);
@@ -246,10 +245,7 @@ export default function BusinessTransactions() {
 	};
 
 	const getAvatarUrl = (user: any) => {
-		console.log('🖼️ Getting avatar for user:', user);
-
 		if (user?.avatar_url && user.avatar_url.trim()) {
-			console.log('✅ Using custom avatar:', user.avatar_url);
 			return user.avatar_url;
 		}
 
@@ -260,11 +256,7 @@ export default function BusinessTransactions() {
 			user?.id ||
 			'user';
 
-		console.log('🎨 Generating default avatar for username:', username);
-		const avatarUrl = AvatarService.generateDefaultAvatar(username);
-		console.log('🎨 Generated avatar URL:', avatarUrl);
-
-		return avatarUrl;
+		return AvatarService.generateDefaultAvatar(username);
 	};
 
 	const renderStatsCard = () => (
@@ -296,48 +288,66 @@ export default function BusinessTransactions() {
 
 	const renderFilterTabs = () => (
 		<View style={styles.filterContainer}>
-			<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-				{/* Time Frame Filters */}
-				{(['all', 'today', 'week', 'month'] as const).map((timeFrame) => (
-					<TouchableOpacity
-						key={timeFrame}
-						style={[
-							styles.filterTab,
-							filters.timeFrame === timeFrame && styles.activeFilterTab,
-						]}
-						onPress={() => setFilters({ ...filters, timeFrame })}
-					>
-						<Text
-							style={[
-								styles.filterTabText,
-								filters.timeFrame === timeFrame && styles.activeFilterTabText,
-							]}
-						>
-							{timeFrame.charAt(0).toUpperCase() + timeFrame.slice(1)}
-						</Text>
-					</TouchableOpacity>
-				))}
+			<ScrollView
+				horizontal
+				showsHorizontalScrollIndicator={false}
+				contentContainerStyle={styles.filterScrollContent}
+			>
+				{/* Time Frame Section */}
+				<View style={styles.filterSection}>
+					<Text style={styles.filterSectionLabel}>Time:</Text>
+					<View style={styles.filterGroup}>
+						{(['all', 'today', 'week', 'month'] as const).map((timeFrame) => (
+							<TouchableOpacity
+								key={timeFrame}
+								style={[
+									styles.filterTab,
+									filters.timeFrame === timeFrame && styles.activeFilterTab,
+								]}
+								onPress={() => setFilters({ ...filters, timeFrame })}
+							>
+								<Text
+									style={[
+										styles.filterTabText,
+										filters.timeFrame === timeFrame &&
+											styles.activeFilterTabText,
+									]}
+								>
+									{timeFrame.charAt(0).toUpperCase() + timeFrame.slice(1)}
+								</Text>
+							</TouchableOpacity>
+						))}
+					</View>
+				</View>
 
-				{/* Type Filters */}
-				{(['all', 'received', 'sent'] as const).map((type) => (
-					<TouchableOpacity
-						key={type}
-						style={[
-							styles.filterTab,
-							filters.type === type && styles.activeFilterTab,
-						]}
-						onPress={() => setFilters({ ...filters, type })}
-					>
-						<Text
-							style={[
-								styles.filterTabText,
-								filters.type === type && styles.activeFilterTabText,
-							]}
-						>
-							{type.charAt(0).toUpperCase() + type.slice(1)}
-						</Text>
-					</TouchableOpacity>
-				))}
+				{/* Separator */}
+				<View style={styles.filterSeparator} />
+
+				{/* Type Section */}
+				<View style={styles.filterSection}>
+					<Text style={styles.filterSectionLabel}>Type:</Text>
+					<View style={styles.filterGroup}>
+						{(['all', 'received', 'sent'] as const).map((type) => (
+							<TouchableOpacity
+								key={type}
+								style={[
+									styles.filterTab,
+									filters.type === type && styles.activeFilterTab,
+								]}
+								onPress={() => setFilters({ ...filters, type })}
+							>
+								<Text
+									style={[
+										styles.filterTabText,
+										filters.type === type && styles.activeFilterTabText,
+									]}
+								>
+									{type.charAt(0).toUpperCase() + type.slice(1)}
+								</Text>
+							</TouchableOpacity>
+						))}
+					</View>
+				</View>
 			</ScrollView>
 		</View>
 	);
@@ -345,11 +355,6 @@ export default function BusinessTransactions() {
 	const renderTransactionItem = (transaction: TransactionWithUsers) => {
 		const otherUser = getOtherUser(transaction);
 		const isReceived = transaction.to_user_id === currentProfile?.id;
-
-		console.log('🔄 Rendering transaction:', transaction.id);
-		console.log('👤 Other user:', otherUser);
-		console.log('📥 Is received:', isReceived);
-
 		const avatarUrl = getAvatarUrl(otherUser);
 
 		return (
@@ -386,10 +391,7 @@ export default function BusinessTransactions() {
 								{ position: 'absolute', top: 0, left: 0, zIndex: 1 },
 							]}
 							onError={(error) => {
-								console.error('❌ Avatar load error for:', avatarUrl, error);
-							}}
-							onLoad={() => {
-								console.log('✅ Avatar loaded successfully:', avatarUrl);
+								console.error('❌ Avatar load error:', error);
 							}}
 						/>
 					)}
@@ -574,13 +576,36 @@ const styles = StyleSheet.create({
 	filterContainer: {
 		marginBottom: 16,
 	},
+	filterScrollContent: {
+		paddingHorizontal: 24,
+		alignItems: 'center',
+	},
+	filterSection: {
+		alignItems: 'center',
+	},
+	filterSectionLabel: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#374151',
+		marginBottom: 8,
+		textAlign: 'center',
+	},
+	filterGroup: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	filterSeparator: {
+		width: 1,
+		height: 40,
+		backgroundColor: '#e5e7eb',
+		marginHorizontal: 16,
+	},
 	filterTab: {
 		paddingHorizontal: 16,
 		paddingVertical: 8,
 		marginHorizontal: 4,
 		backgroundColor: '#f3f4f6',
 		borderRadius: 20,
-		marginLeft: 24,
 	},
 	activeFilterTab: {
 		backgroundColor: '#3b82f6',
