@@ -353,7 +353,9 @@ export default function SendModal({
 	};
 
 	const isValidAmount = amount && parseFloat(amount) > 0;
-	const canSend = selectedUsers.length > 0 && isValidAmount && !isSending;
+	const hasValidCategory = selectedCategory !== undefined;
+	const canSend =
+		selectedUsers.length > 0 && isValidAmount && hasValidCategory && !isSending;
 
 	// Show success state
 	if (showSuccess) {
@@ -734,15 +736,22 @@ export default function SendModal({
 							{/* Category Selection */}
 							<View className='mb-6'>
 								<Text className='mb-3 text-lg font-semibold text-gray-900'>
-									Category (Optional)
+									Category <Text className='text-red-500'>*</Text>
 								</Text>
 								<Text className='mb-3 text-sm text-gray-600'>
 									Select a category to help track your spending and auto-link to
 									savings pots
 								</Text>
+								{!hasValidCategory && (
+									<Text className='mb-2 text-sm text-red-500'>
+										⚠️ Category selection is required
+									</Text>
+								)}
 								<TouchableOpacity
 									onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
-									className='border-2 border-gray-300 rounded-xl bg-white p-4 flex-row items-center justify-between'
+									className={`border-2 rounded-xl bg-white p-4 flex-row items-center justify-between ${
+										!hasValidCategory ? 'border-red-300' : 'border-gray-300'
+									}`}
 								>
 									<View className='flex-row items-center'>
 										{selectedCategoryOption ? (

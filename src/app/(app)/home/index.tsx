@@ -367,7 +367,12 @@ export default function HomeScreen() {
 			}, 2000); // Wait 2 seconds for transaction to be confirmed
 		}
 
-		// Close modal
+		// Don't close modal here - let the success popup handle it
+		// The SendModal will show success state and user can manually close
+	};
+
+	// Handle modal close (when user clicks "Done" on success popup)
+	const handleSendModalClose = () => {
 		setSendModalVisible(false);
 	};
 
@@ -466,7 +471,7 @@ export default function HomeScreen() {
 			{/* Send Modal */}
 			<SendModal
 				visible={sendModalVisible}
-				onClose={() => setSendModalVisible(false)}
+				onClose={handleSendModalClose}
 				onSend={handleSendComplete}
 			/>
 
