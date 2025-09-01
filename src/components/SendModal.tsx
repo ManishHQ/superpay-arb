@@ -18,9 +18,15 @@ import LottieView from 'lottie-react-native';
 import { useUserProfileStore } from '@/stores/userProfileStore';
 import { useBalanceStore } from '@/stores/balanceStore';
 import { useWalletStore } from '@/stores/walletStore';
+import { useSavingsPotsStore } from '@/stores/savingsPotsStore';
 import { UserProfile } from '@/types/supabase';
 import { WalletService } from '@/services/walletService';
 import { USDCService } from '@/services/usdcService';
+import {
+	TransactionService,
+	TransactionCategory,
+} from '@/services/transactionService';
+import { PotsActivityService } from '@/services/potsActivityService';
 import { publicClient } from '@/lib/client';
 import { debounce } from 'lodash';
 
@@ -33,8 +39,18 @@ interface SendModalProps {
 		amount: number,
 		recipients: string[],
 		note: string,
-		currency: CurrencyType
+		currency: CurrencyType,
+		category?: TransactionCategory,
+		potId?: string
 	) => void;
+	prefillData?: {
+		amount?: string;
+		recipient?: string;
+		note?: string;
+		recipientName?: string;
+		category?: TransactionCategory;
+		potId?: string;
+	};
 }
 
 interface SelectedUser {
@@ -49,6 +65,7 @@ export default function SendModal({
 	visible,
 	onClose,
 	onSend,
+	prefillData,
 }: SendModalProps) {
 	const [selectedUsers, setSelectedUsers] = useState<SelectedUser[]>([]);
 	const [amount, setAmount] = useState('');
@@ -61,6 +78,11 @@ export default function SendModal({
 		useState<CurrencyType>('USDC');
 	const [showSuccess, setShowSuccess] = useState(false);
 	const [transactionHash, setTransactionHash] = useState<string>('');
+	const [selectedCategory, setSelectedCategory] = useState<
+		TransactionCategory | undefined
+	>();
+	const [selectedPotId, setSelectedPotId] = useState<string | undefined>();
+	const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
 	// Lottie animation ref
 	const successAnimation = useRef<LottieView>(null);
@@ -72,10 +94,30 @@ export default function SendModal({
 	const { searchUsers } = useUserProfileStore();
 	const { address: walletAddress } = useWalletStore();
 	const { getBalance } = useBalanceStore();
+	const { getActivePots } = useSavingsPotsStore();
 
 	// Get current balances
 	const ethBalance = walletAddress ? getBalance(walletAddress, 'eth') : null;
 	const usdcBalance = walletAddress ? getBalance(walletAddress, 'usdc') : null;
+
+	// Category options
+	const categoryOptions = [
+		{ key: 'food', label: 'Food & Dining', icon: '🍕' },
+		{ key: 'transport', label: 'Transport', icon: '🚗' },
+		{ key: 'shopping', label: 'Shopping', icon: '🛍️' },
+		{ key: 'entertainment', label: 'Entertainment', icon: '🎮' },
+		{ key: 'healthcare', label: 'Healthcare', icon: '🏥' },
+		{ key: 'utilities', label: 'Utilities', icon: '💡' },
+		{ key: 'housing', label: 'Housing', icon: '🏠' },
+		{ key: 'emergency', label: 'Emergency', icon: '🛡️' },
+		{ key: 'vacation', label: 'Vacation', icon: '✈️' },
+		{ key: 'investment', label: 'Investment', icon: '📈' },
+		{ key: 'other', label: 'Other', icon: '📦' },
+	];
+
+	const selectedCategoryOption = categoryOptions.find(
+		(cat) => cat.key === selectedCategory
+	);
 
 	// Get available balance for selected currency
 	const availableBalance =
@@ -83,20 +125,49 @@ export default function SendModal({
 			? ethBalance?.formatted || '0.0000'
 			: usdcBalance?.formatted || '0.00';
 
-	// Reset modal state when opened
+	// Reset modal state when opened and handle prefill data
 	useEffect(() => {
 		if (visible) {
-			setSelectedUsers([]);
-			setAmount('');
-			setNote('');
+			// Apply prefill data if available
+			if (prefillData) {
+				setAmount(prefillData.amount || '');
+				setNote(prefillData.note || '');
+
+				// If recipient info is provided, create a selected user
+				if (prefillData.recipient && prefillData.recipientName) {
+					const prefillUser: SelectedUser = {
+						id: 'prefill_' + Date.now(),
+						username: prefillData.recipientName
+							.toLowerCase()
+							.replace(/\s+/g, '_'),
+						full_name: prefillData.recipientName,
+						wallet_address: prefillData.recipient,
+					};
+					setSelectedUsers([prefillUser]);
+				} else {
+					setSelectedUsers([]);
+				}
+
+				// Set category and pot ID from prefill data
+				setSelectedCategory(prefillData.category);
+				setSelectedPotId(prefillData.potId);
+			} else {
+				setSelectedUsers([]);
+				setAmount('');
+				setNote('');
+				setSelectedCategory(undefined);
+				setSelectedPotId(undefined);
+			}
+
 			setSearchQuery('');
 			setSearchResults([]);
 			setSelectedCurrency('USDC');
 			setIsSending(false);
 			setShowSuccess(false);
 			setTransactionHash('');
+			setShowCategoryDropdown(false);
 		}
-	}, [visible]);
+	}, [visible, prefillData]);
 
 	// Debounced search function
 	const debouncedSearch = useCallback(
@@ -176,12 +247,70 @@ export default function SendModal({
 				// Play the success animation
 				successAnimation.current?.play();
 
+				// Create transaction record in database
+				try {
+					const transaction = await TransactionService.createTransaction({
+						to_user_id: recipient.id,
+						amount: numericAmount,
+						currency: selectedCurrency,
+						note: note,
+						transaction_hash: txResult.hash,
+						block_number: txResult.blockNumber,
+						blockchain: 'ethereum',
+						network: 'base-sepolia',
+						transaction_type: 'transfer',
+						category: selectedCategory,
+						gas_fee: txResult.gasUsed
+							? Number(txResult.gasUsed) * 0.000000001
+							: undefined, // Convert wei to ETH
+						gas_fee_currency: 'ETH',
+					});
+
+					console.log('Transaction created:', transaction.id);
+
+					// Link transaction to pot if specified
+					if (selectedPotId) {
+						try {
+							await PotsActivityService.linkTransactionToPot(
+								transaction,
+								selectedPotId,
+								'deposit'
+							);
+							console.log('Transaction linked to pot:', selectedPotId);
+						} catch (error) {
+							console.error('Failed to link transaction to pot:', error);
+							// Don't fail the entire transaction if pot linking fails
+						}
+					} else if (selectedCategory) {
+						// Auto-link to pots based on category
+						try {
+							const activities =
+								await PotsActivityService.autoLinkTransactionToPots(
+									transaction
+								);
+							if (activities.length > 0) {
+								console.log(
+									`Transaction auto-linked to ${activities.length} pots`
+								);
+							}
+						} catch (error) {
+							console.error('Failed to auto-link transaction to pots:', error);
+							// Don't fail the entire transaction if auto-linking fails
+						}
+					}
+				} catch (error) {
+					console.error('Failed to create transaction record:', error);
+					// Continue with success flow even if database transaction fails
+				}
+
 				// Call the parent callback
 				onSend(
 					numericAmount,
 					[recipient.wallet_address],
 					note,
-					selectedCurrency
+					selectedCurrency,
+					selectedCategory,
+					selectedPotId
 				);
 			} else {
 				Alert.alert(
@@ -211,6 +340,7 @@ export default function SendModal({
 		setSelectedUsers([selectedUser]);
 		setSearchQuery('');
 		setSearchResults([]);
+		setShowCategoryDropdown(false);
 	};
 
 	const handleRemoveUser = (userId: string) => {
@@ -218,9 +348,8 @@ export default function SendModal({
 	};
 
 	const handleClose = () => {
-		if (!isSending && !showSuccess) {
-			onClose();
-		}
+		// Allow closing at any time, including during success state
+		onClose();
 	};
 
 	const isValidAmount = amount && parseFloat(amount) > 0;
@@ -261,9 +390,26 @@ export default function SendModal({
 						<Text className='mb-2 text-2xl font-bold text-center text-green-600'>
 							Payment Sent Successfully!
 						</Text>
-						<Text className='mb-4 text-lg text-center text-gray-600'>
+						<Text className='mb-2 text-lg text-center text-gray-600'>
 							{amount} {selectedCurrency} sent to {selectedUsers[0]?.username}
 						</Text>
+						{selectedCategory && (
+							<Text className='mb-2 text-sm text-center text-blue-600'>
+								📊 Categorized as:{' '}
+								{selectedCategory.charAt(0).toUpperCase() +
+									selectedCategory.slice(1)}
+							</Text>
+						)}
+						{selectedPotId && (
+							<Text className='mb-2 text-sm text-center text-green-600'>
+								🏦 Added to savings pot automatically
+							</Text>
+						)}
+						{selectedCategory && !selectedPotId && (
+							<Text className='mb-2 text-sm text-center text-orange-600'>
+								🔄 Auto-linked to matching pots
+							</Text>
+						)}
 
 						{/* Transaction Hash */}
 						{transactionHash && (
@@ -287,11 +433,6 @@ export default function SendModal({
 						>
 							<Text className='text-lg font-semibold text-white'>Done</Text>
 						</TouchableOpacity>
-
-						{/* Auto-close indicator */}
-						<Text className='mt-4 text-sm text-gray-400'>
-							Closing automatically in 3 seconds...
-						</Text>
 					</View>
 				</View>
 			</Modal>
@@ -589,6 +730,185 @@ export default function SendModal({
 									textAlignVertical='top'
 								/>
 							</View>
+
+							{/* Category Selection */}
+							<View className='mb-6'>
+								<Text className='mb-3 text-lg font-semibold text-gray-900'>
+									Category (Optional)
+								</Text>
+								<Text className='mb-3 text-sm text-gray-600'>
+									Select a category to help track your spending and auto-link to
+									savings pots
+								</Text>
+								<TouchableOpacity
+									onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
+									className='border-2 border-gray-300 rounded-xl bg-white p-4 flex-row items-center justify-between'
+								>
+									<View className='flex-row items-center'>
+										{selectedCategoryOption ? (
+											<>
+												<Text className='text-lg mr-2'>
+													{selectedCategoryOption.icon}
+												</Text>
+												<Text className='text-base font-medium text-gray-900'>
+													{selectedCategoryOption.label}
+												</Text>
+											</>
+										) : (
+											<Text className='text-base text-gray-500'>
+												Select a category...
+											</Text>
+										)}
+									</View>
+									<Ionicons
+										name={showCategoryDropdown ? 'chevron-up' : 'chevron-down'}
+										size={20}
+										color='#6B7280'
+									/>
+								</TouchableOpacity>
+
+								{/* Dropdown Options */}
+								{showCategoryDropdown && (
+									<View className='border-2 border-gray-300 rounded-xl bg-white mt-1'>
+										<TouchableOpacity
+											onPress={() => {
+												setSelectedCategory(undefined);
+												setShowCategoryDropdown(false);
+											}}
+											className='p-4 border-b border-gray-100'
+										>
+											<Text className='text-base text-gray-500'>
+												Clear selection
+											</Text>
+										</TouchableOpacity>
+										{categoryOptions.map((category) => (
+											<TouchableOpacity
+												key={category.key}
+												onPress={() => {
+													setSelectedCategory(
+														category.key as TransactionCategory
+													);
+													setShowCategoryDropdown(false);
+												}}
+												className='p-4 border-b border-gray-100 last:border-b-0 flex-row items-center'
+											>
+												<Text className='text-lg mr-3'>{category.icon}</Text>
+												<Text
+													className={`text-base font-medium ${
+														selectedCategory === category.key
+															? 'text-blue-900'
+															: 'text-gray-900'
+													}`}
+												>
+													{category.label}
+												</Text>
+												{selectedCategory === category.key && (
+													<View className='ml-auto'>
+														<Ionicons
+															name='checkmark'
+															size={20}
+															color='#3B82F6'
+														/>
+													</View>
+												)}
+											</TouchableOpacity>
+										))}
+									</View>
+								)}
+								{selectedCategory && (
+									<TouchableOpacity
+										onPress={() => setSelectedCategory(undefined)}
+										className='mt-2 self-start p-2 rounded-lg bg-gray-100'
+									>
+										<Text className='text-sm text-gray-600'>
+											Clear category
+										</Text>
+									</TouchableOpacity>
+								)}
+							</View>
+
+							{/* Pot Selection */}
+							{selectedCategory && (
+								<View className='mb-6'>
+									<Text className='mb-3 text-lg font-semibold text-gray-900'>
+										Add to Savings Pot (Optional)
+									</Text>
+									<Text className='mb-3 text-sm text-gray-600'>
+										Automatically add this transaction to a savings pot
+									</Text>
+									<View className='space-y-2'>
+										{getActivePots()
+											.filter((pot) => pot.category === selectedCategory)
+											.map((pot) => (
+												<TouchableOpacity
+													key={pot.id}
+													onPress={() =>
+														setSelectedPotId(
+															selectedPotId === pot.id ? undefined : pot.id
+														)
+													}
+													className={`p-4 rounded-xl border-2 ${
+														selectedPotId === pot.id
+															? 'border-green-500 bg-green-50'
+															: 'border-gray-200 bg-white'
+													}`}
+												>
+													<View className='flex-row items-center justify-between'>
+														<View className='flex-row items-center flex-1'>
+															<Text className='mr-3 text-2xl'>{pot.icon}</Text>
+															<View className='flex-1'>
+																<Text
+																	className={`font-semibold ${
+																		selectedPotId === pot.id
+																			? 'text-green-900'
+																			: 'text-gray-900'
+																	}`}
+																>
+																	{pot.name}
+																</Text>
+																<Text
+																	className={`text-sm ${
+																		selectedPotId === pot.id
+																			? 'text-green-700'
+																			: 'text-gray-500'
+																	}`}
+																>
+																	Current: ${pot.currentAmount.toFixed(2)} /
+																	Target: ${pot.targetAmount.toFixed(2)}
+																</Text>
+															</View>
+														</View>
+														<View
+															className={`w-6 h-6 rounded-full border-2 ${
+																selectedPotId === pot.id
+																	? 'border-green-500 bg-green-500'
+																	: 'border-gray-300'
+															} items-center justify-center`}
+														>
+															{selectedPotId === pot.id && (
+																<Ionicons
+																	name='checkmark'
+																	size={14}
+																	color='white'
+																/>
+															)}
+														</View>
+													</View>
+												</TouchableOpacity>
+											))}
+									</View>
+									{selectedPotId && (
+										<TouchableOpacity
+											onPress={() => setSelectedPotId(undefined)}
+											className='mt-2 self-start p-2 rounded-lg bg-gray-100'
+										>
+											<Text className='text-sm text-gray-600'>
+												Don't add to pot
+											</Text>
+										</TouchableOpacity>
+									)}
+								</View>
+							)}
 
 							{/* Send Button */}
 							<TouchableOpacity

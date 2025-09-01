@@ -1,4 +1,4 @@
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, Redirect, useRouter, useSegments } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
 	Platform,
@@ -7,6 +7,7 @@ import {
 	View,
 	Text,
 	useWindowDimensions,
+	TouchableOpacity,
 } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
@@ -21,16 +22,52 @@ const styles = StyleSheet.create({
 	},
 	sidebar: {
 		width: 250,
-		backgroundColor: '#f8f9fa',
+		backgroundColor: '#ffffff',
 		borderRightWidth: 1,
-		borderRightColor: '#e9ecef',
+		borderRightColor: '#f3f4f6',
 		paddingTop: 20,
+		shadowColor: '#000',
+		shadowOffset: { width: 2, height: 0 },
+		shadowOpacity: 0.1,
+		shadowRadius: 8,
+		elevation: 5,
 	},
 	content: {
 		flex: 1,
 	},
 	mobileContainer: {
 		flex: 1,
+	},
+	sidebarHeader: {
+		fontSize: 20,
+		fontWeight: '700',
+		color: '#111827',
+		marginBottom: 32,
+		paddingHorizontal: 24,
+	},
+	navButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+		paddingVertical: 16,
+		marginHorizontal: 12,
+		marginVertical: 2,
+		borderRadius: 12,
+	},
+	navButtonActive: {
+		backgroundColor: '#f3f4f6',
+	},
+	navIcon: {
+		marginRight: 16,
+	},
+	navLabel: {
+		fontSize: 16,
+		fontWeight: '500',
+		color: '#374151',
+	},
+	navLabelActive: {
+		color: '#111827',
+		fontWeight: '600',
 	},
 });
 
@@ -40,6 +77,8 @@ export default function BusinessLayout() {
 	const [authChecked, setAuthChecked] = useState(false);
 	const { width } = useWindowDimensions();
 	const isDesktop = width >= 768;
+	const router = useRouter();
+	const segments = useSegments();
 
 	// Check authentication status
 	useEffect(() => {
@@ -75,100 +114,154 @@ export default function BusinessLayout() {
 		return <Redirect href='/login' />;
 	}
 
+	const currentRoute = segments[segments.length - 1];
+
+	const navigationItems = [
+		{
+			name: 'home/index',
+			title: 'Dashboard',
+			icon: 'home',
+			iconOutline: 'home-outline',
+		},
+		{
+			name: 'customers/index',
+			title: 'Customers',
+			icon: 'people',
+			iconOutline: 'people-outline',
+		},
+		{
+			name: 'requests/index',
+			title: 'Payment Requests',
+			icon: 'card',
+			iconOutline: 'card-outline',
+		},
+		{
+			name: 'transactions/index',
+			title: 'Transactions',
+			icon: 'receipt',
+			iconOutline: 'receipt-outline',
+		},
+		{
+			name: 'settings/index',
+			title: 'Settings',
+			icon: 'settings',
+			iconOutline: 'settings-outline',
+		},
+	];
+
 	if (isDesktop) {
 		return (
 			<View style={styles.container}>
-				<Tabs
-					screenOptions={{
-						headerShown: false,
-						tabBarButton: HapticTab,
-						tabBarStyle: {
-							position: 'absolute',
-							left: 0,
-							top: 0,
-							bottom: 0,
-							width: 250,
-							height: '100%',
-							backgroundColor: '#f8f9fa',
-							borderRightWidth: 1,
-							borderRightColor: '#e9ecef',
-							flexDirection: 'column',
-							paddingTop: 20,
-							paddingHorizontal: 0,
-						},
-						tabBarLabelStyle: {
-							fontSize: 14,
-							fontWeight: '500',
-							marginLeft: 12,
-						},
-						tabBarIconStyle: {
-							marginRight: 8,
-						},
-						tabBarItemStyle: {
-							flexDirection: 'row',
-							justifyContent: 'flex-start',
-							alignItems: 'center',
-							paddingHorizontal: 16,
-							paddingVertical: 12,
-							marginHorizontal: 8,
-							marginVertical: 2,
-							borderRadius: 8,
-						},
-					}}
-				>
-					<Tabs.Screen
-						name='home/index'
-						options={{
-							title: 'Dashboard',
-							tabBarIcon: ({ color, focused }) => (
+				<View style={styles.sidebar}>
+					<View className='flex-row items-center justify-between'>
+						<Text style={styles.sidebarHeader}>Business Dashboard</Text>
+					</View>
+					{navigationItems.map((item) => {
+						const isActive =
+							currentRoute === item.name ||
+							(currentRoute === 'index' && item.name === 'home/index');
+						return (
+							<TouchableOpacity
+								key={item.name}
+								style={[styles.navButton, isActive && styles.navButtonActive]}
+								onPress={() =>
+									router.push(`/business/${item.name.replace('/index', '')}`)
+								}
+							>
 								<Ionicons
+									name={
+										isActive ? (item.icon as any) : (item.iconOutline as any)
+									}
 									size={20}
-									name={focused ? 'home' : 'home-outline'}
-									color={color}
+									color={isActive ? '#111827' : '#6b7280'}
+									style={styles.navIcon}
 								/>
-							),
+								<Text
+									style={[styles.navLabel, isActive && styles.navLabelActive]}
+								>
+									{item.title}
+								</Text>
+							</TouchableOpacity>
+						);
+					})}
+				</View>
+				<View style={styles.content}>
+					<Tabs
+						screenOptions={{
+							headerShown: false,
+							tabBarButton: HapticTab,
+							tabBarStyle: {
+								display: 'none',
+							},
 						}}
-					/>
-					<Tabs.Screen
-						name='customers/index'
-						options={{
-							title: 'Customers',
-							tabBarIcon: ({ color, focused }) => (
-								<Ionicons
-									size={20}
-									name={focused ? 'people' : 'people-outline'}
-									color={color}
-								/>
-							),
-						}}
-					/>
-					<Tabs.Screen
-						name='transactions/index'
-						options={{
-							title: 'Transactions',
-							tabBarIcon: ({ color, focused }) => (
-								<Ionicons
-									size={20}
-									name={focused ? 'receipt' : 'receipt-outline'}
-									color={color}
-								/>
-							),
-						}}
-					/>
-					<Tabs.Screen
-						name='settings/index'
-						options={{
-							title: 'Settings',
-							tabBarIcon: ({ color, focused }) => (
-								<Ionicons
-									size={20}
-									name={focused ? 'settings' : 'settings-outline'}
-									color={color}
-								/>
-							),
-						}}
-					/>
-				</Tabs>
+					>
+						<Tabs.Screen
+							name='home/index'
+							options={{
+								title: 'Dashboard',
+								tabBarIcon: ({ color, focused }) => (
+									<Ionicons
+										size={20}
+										name={focused ? 'home' : 'home-outline'}
+										color={color}
+									/>
+								),
+							}}
+						/>
+						<Tabs.Screen
+							name='customers/index'
+							options={{
+								title: 'Customers',
+								tabBarIcon: ({ color, focused }) => (
+									<Ionicons
+										size={20}
+										name={focused ? 'people' : 'people-outline'}
+										color={color}
+									/>
+								),
+							}}
+						/>
+						<Tabs.Screen
+							name='requests/index'
+							options={{
+								title: 'Payment Requests',
+								tabBarIcon: ({ color, focused }) => (
+									<Ionicons
+										size={20}
+										name={focused ? 'card' : 'card-outline'}
+										color={color}
+									/>
+								),
+							}}
+						/>
+						<Tabs.Screen
+							name='transactions/index'
+							options={{
+								title: 'Transactions',
+								tabBarIcon: ({ color, focused }) => (
+									<Ionicons
+										size={20}
+										name={focused ? 'receipt' : 'receipt-outline'}
+										color={color}
+									/>
+								),
+							}}
+						/>
+						<Tabs.Screen
+							name='settings/index'
+							options={{
+								title: 'Settings',
+								tabBarIcon: ({ color, focused }) => (
+									<Ionicons
+										size={20}
+										name={focused ? 'settings' : 'settings-outline'}
+										color={color}
+									/>
+								),
+							}}
+						/>
+					</Tabs>
+				</View>
 				<StatusBar backgroundColor='#fff' barStyle='dark-content' />
 			</View>
 		);
@@ -210,6 +303,19 @@ export default function BusinessLayout() {
 							<Ionicons
 								size={24}
 								name={focused ? 'people' : 'people-outline'}
+								color={color}
+							/>
+						),
+					}}
+				/>
+				<Tabs.Screen
+					name='requests/index'
+					options={{
+						title: 'Requests',
+						tabBarIcon: ({ color, focused }) => (
+							<Ionicons
+								size={24}
+								name={focused ? 'card' : 'card-outline'}
 								color={color}
 							/>
 						),

@@ -23,6 +23,7 @@ import { dynamicClient } from '@/lib/client';
 import { Wallet } from '@dynamic-labs/client';
 import { useWalletStore } from '@/stores/walletStore';
 import { useBalanceStore, useBalanceInvalidation } from '@/stores/balanceStore';
+import { router } from 'expo-router';
 
 // Default data fallbacks
 const defaultUser = {
@@ -329,8 +330,7 @@ export default function HomeScreen() {
 			iconColor: 'white',
 			bgColor: 'bg-purple-600',
 			onPress: () => {
-				// Navigate to savings pots (Activity screen)
-				console.log('Navigate to savings pots');
+				router.push('/pots');
 			},
 		},
 	];
@@ -340,9 +340,18 @@ export default function HomeScreen() {
 		amount: number,
 		recipients: string[],
 		note: string,
-		currency: 'USDC' | 'ETH'
+		currency: 'USDC' | 'ETH',
+		category?: string,
+		potId?: string
 	) => {
-		console.log('Send completed:', { amount, recipients, note, currency });
+		console.log('Send completed:', {
+			amount,
+			recipients,
+			note,
+			currency,
+			category,
+			potId,
+		});
 		// Update stats
 		setDynamicStats((prev) => ({
 			...prev,
