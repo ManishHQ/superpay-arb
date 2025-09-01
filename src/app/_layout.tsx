@@ -28,6 +28,7 @@ export default function AppLayout() {
 						<Stack.Screen name='login' options={{ headerShown: false }} />
 						<Stack.Screen name='(app)' options={{ headerShown: false }} />
 						<Stack.Screen name='business' options={{ headerShown: false }} />
+						<Stack.Screen name='expo-qr' options={{ headerShown: false }} />
 					</Stack>
 				</BottomSheetModalProvider>
 			</GestureHandlerRootView>

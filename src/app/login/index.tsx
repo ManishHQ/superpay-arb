@@ -151,11 +151,22 @@ export default function LoginPage() {
 	// Show loading while SDK initializes
 	if (!sdk.loaded) {
 		return (
-			<SafeAreaView style={styles.container}>
+			<SafeAreaView
+				style={styles.container}
+				className='web:min-h-screen web:bg-slate-50'
+			>
 				<StatusBar style='dark' backgroundColor='#F8FAFC' />
-				<View style={styles.loadingContainer}>
+				<View
+					style={styles.loadingContainer}
+					className='web:min-h-screen web:flex web:items-center web:justify-center'
+				>
 					<ActivityIndicator size='large' color='#3b82f6' />
-					<Text style={styles.loadingText}>Initializing SuperPay...</Text>
+					<Text
+						style={styles.loadingText}
+						className='web:text-lg web:text-slate-600 web:font-medium web:mt-4'
+					>
+						Initializing SuperPay...
+					</Text>
 				</View>
 			</SafeAreaView>
 		);
@@ -310,9 +321,20 @@ export default function LoginPage() {
 	const renderContent = () => {
 		if (usedOneTimePasswordMethod !== null) {
 			return (
-				<View style={styles.otpContainer}>
-					<Text style={styles.otpTitle}>Verify your code</Text>
-					<Text style={styles.otpSubtitle}>
+				<View
+					style={styles.otpContainer}
+					className='web:w-full web:max-w-md web:mx-auto'
+				>
+					<Text
+						style={styles.otpTitle}
+						className='web:text-3xl web:font-bold web:text-slate-800 web:mb-2 web:text-center'
+					>
+						Verify your code
+					</Text>
+					<Text
+						style={styles.otpSubtitle}
+						className='web:text-base web:text-slate-600 web:text-center web:mb-8 web:leading-relaxed'
+					>
 						We sent a 6-digit code to your{' '}
 						{usedOneTimePasswordMethod === 'email'
 							? 'email address'
@@ -321,6 +343,7 @@ export default function LoginPage() {
 
 					<TextInput
 						style={styles.otpInput}
+						className='web:w-full web:max-w-xs web:mx-auto web:text-center web:tracking-widest web:font-bold web:text-2xl web:bg-slate-50 web:border-2 web:border-slate-200 web:rounded-2xl web:px-6 web:py-4 web:mb-6'
 						placeholder={isLoading ? 'Verifying...' : 'Enter OTP'}
 						value={otpToken}
 						onChangeText={setOtpToken}
@@ -337,25 +360,37 @@ export default function LoginPage() {
 							styles.otpButton,
 							(isLoading || !otpToken.trim()) && styles.buttonDisabled,
 						]}
+						className='web:w-full web:max-w-xs web:mx-auto web:bg-blue-500 web:rounded-2xl web:py-4 web:px-8 web:shadow-lg web:shadow-blue-500/30 web:mb-4'
 						onPress={() => handleOTPVerification(otpToken)}
 						disabled={isLoading || !otpToken.trim()}
 					>
 						{isLoading ? (
 							<ActivityIndicator color='#ffffff' />
 						) : (
-							<Text style={styles.buttonText}>Verify Code</Text>
+							<Text
+								style={styles.buttonText}
+								className='web:text-white web:text-base web:font-semibold'
+							>
+								Verify Code
+							</Text>
 						)}
 					</TouchableOpacity>
 
 					<TouchableOpacity
 						style={styles.backButton}
+						className='web:py-3 web:px-6 web:mx-auto'
 						onPress={() => {
 							setUsedOneTimePasswordMethod(null);
 							setOtpToken('');
 						}}
 						disabled={isLoading}
 					>
-						<Text style={styles.backButtonText}>Back to Login</Text>
+						<Text
+							style={styles.backButtonText}
+							className='web:text-slate-500 web:text-base web:font-medium web:text-center'
+						>
+							Back to Login
+						</Text>
 					</TouchableOpacity>
 				</View>
 			);
@@ -364,10 +399,16 @@ export default function LoginPage() {
 		return (
 			<>
 				{/* Email Login - Primary Method */}
-				<View style={styles.inputContainer}>
-					<Text style={styles.sectionTitle}>Sign in with Email</Text>
+				<View style={styles.inputContainer} className='web:mb-6'>
+					<Text
+						style={styles.sectionTitle}
+						className='web:text-xl web:font-semibold web:text-slate-800 web:mb-4 web:text-center'
+					>
+						Sign in with Email
+					</Text>
 					<TextInput
 						style={styles.fullWidthInput}
+						className='web:w-full web:bg-slate-50 web:border-2 web:border-slate-200 web:rounded-2xl web:px-5 web:py-4 web:text-base web:text-slate-800 web:mb-4 web:focus:border-blue-500 web:transition-colors'
 						placeholder='Enter your email address'
 						value={email}
 						onChangeText={setEmail}
@@ -382,6 +423,7 @@ export default function LoginPage() {
 							styles.primaryButton,
 							(isLoading || !email.trim()) && styles.buttonDisabled,
 						]}
+						className='web:w-full web:bg-blue-500 web:rounded-2xl web:py-4 web:px-6 web:flex-row web:items-center web:justify-center web:shadow-lg web:shadow-blue-500/30 web:hover:bg-blue-600 web:transition-colors'
 						onPress={() => handleEmailLogin(email)}
 						disabled={isLoading || !email.trim()}
 					>
@@ -390,22 +432,42 @@ export default function LoginPage() {
 						) : (
 							<>
 								<Ionicons name='mail' size={20} color='#ffffff' />
-								<Text style={styles.buttonText}>Continue with Email</Text>
+								<Text
+									style={styles.buttonText}
+									className='web:text-white web:text-base web:font-semibold web:ml-2'
+								>
+									Continue with Email
+								</Text>
 							</>
 						)}
 					</TouchableOpacity>
 				</View>
 
 				{/* Divider */}
-				<View style={styles.dividerContainer}>
-					<View style={styles.divider} />
-					<Text style={styles.dividerText}>or</Text>
-					<View style={styles.divider} />
+				<View
+					style={styles.dividerContainer}
+					className='web:flex-row web:items-center web:my-6'
+				>
+					<View
+						style={styles.divider}
+						className='web:flex-1 web:h-px web:bg-slate-200'
+					/>
+					<Text
+						style={styles.dividerText}
+						className='web:mx-4 web:text-sm web:text-slate-400 web:font-medium'
+					>
+						or
+					</Text>
+					<View
+						style={styles.divider}
+						className='web:flex-1 web:h-px web:bg-slate-200'
+					/>
 				</View>
 
 				{/* Phone Login - Secondary Button */}
 				<TouchableOpacity
 					style={styles.secondaryButton}
+					className='web:w-full web:bg-white web:border-2 web:border-slate-200 web:rounded-2xl web:py-4 web:px-6 web:flex-row web:items-center web:justify-center web:hover:border-slate-300 web:transition-colors'
 					onPress={() => {
 						const phoneNumber = phone || '';
 						Alert.prompt(
@@ -431,30 +493,51 @@ export default function LoginPage() {
 					disabled={isLoading}
 				>
 					<Ionicons name='phone-portrait' size={20} color='#3b82f6' />
-					<Text style={styles.secondaryButtonText}>Continue with Phone</Text>
+					<Text
+						style={styles.secondaryButtonText}
+						className='web:text-blue-500 web:text-base web:font-semibold web:ml-2'
+					>
+						Continue with Phone
+					</Text>
 				</TouchableOpacity>
 			</>
 		);
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<SafeAreaView
+			style={styles.container}
+			className='web:min-h-screen web:bg-slate-50'
+		>
 			<StatusBar style='dark' backgroundColor='#F8FAFC' />
 			<KeyboardAvoidingView
 				style={styles.container}
 				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				className='web:min-h-screen'
 			>
 				<ScrollView
 					contentContainerStyle={styles.scrollContainer}
 					keyboardShouldPersistTaps='handled'
+					className='web:flex-grow web:flex web:items-center web:justify-center web:px-6'
 				>
 					{/* Header */}
-					<View style={styles.header}>
-						<View style={styles.logoContainer}>
+					<View style={styles.header} className='web:mb-8 web:items-center'>
+						<View
+							style={styles.logoContainer}
+							className='web:flex-row web:items-center web:mb-4'
+						>
 							<Ionicons name='wallet' size={32} color='#3b82f6' />
-							<Text style={styles.title}>SuperPay</Text>
+							<Text
+								style={styles.title}
+								className='web:text-4xl web:font-bold web:text-slate-800 web:ml-3'
+							>
+								SuperPay
+							</Text>
 						</View>
-						<Text style={styles.subtitle}>
+						<Text
+							style={styles.subtitle}
+							className='web:text-lg web:text-slate-600 web:text-center web:leading-relaxed web:max-w-md'
+						>
 							{usedOneTimePasswordMethod
 								? 'Almost there!'
 								: 'Welcome back to your digital wallet'}
@@ -462,14 +545,35 @@ export default function LoginPage() {
 					</View>
 
 					{/* Main Content Card */}
-					<View style={styles.card}>{renderContent()}</View>
+					<View
+						style={styles.card}
+						className='web:bg-white web:rounded-3xl web:p-8 web:shadow-xl web:shadow-slate-900/10 web:mb-6 web:w-full web:max-w-md'
+					>
+						{renderContent()}
+					</View>
 
 					{/* Footer */}
-					<View style={styles.footer}>
-						<Text style={styles.footerText}>
+					<View
+						style={styles.footer}
+						className='web:items-center web:px-4 web:max-w-md'
+					>
+						<Text
+							style={styles.footerText}
+							className='web:text-xs web:text-slate-400 web:text-center web:leading-relaxed'
+						>
 							By continuing, you agree to SuperPay's Terms of Service and
 							Privacy Policy
 						</Text>
+
+						{/* Expo QR Code Link */}
+						<TouchableOpacity
+							onPress={() => router.push('/expo-qr')}
+							className='web:mt-4 web:py-2 web:px-4 web:bg-slate-100 web:rounded-lg web:hover:bg-slate-200 web:transition-colors'
+						>
+							<Text className='web:text-sm web:text-slate-600 web:font-medium web:flex web:items-center web:justify-center'>
+								📱 Open in Expo Go
+							</Text>
+						</TouchableOpacity>
 					</View>
 				</ScrollView>
 			</KeyboardAvoidingView>

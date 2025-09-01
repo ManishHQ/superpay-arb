@@ -11,3 +11,4 @@ export * from './QuickActions';
 export * from './RecentActivity';
 export * from './XPProgress';
 export * from './HomeHeader';
+export { default as ExpoQRCode } from './ExpoQRCode';

@@ -431,7 +431,7 @@ export default function SendModal({
 									onPress={() => {
 										if (Platform.OS === 'web') {
 											window.open(
-												`https://sepolia.basescan.org/tx/${transactionHash}`,
+												`https://testnet.seitrace.com/tx/${transactionHash}?`,
 												'_blank'
 											);
 										}
@@ -447,7 +447,7 @@ export default function SendModal({
 								</TouchableOpacity>
 								{Platform.OS === 'web' && (
 									<Text className='mt-1 text-xs text-gray-500'>
-										👆 Click to view on BaseScan
+										👆 Click to view on SeiTrace
 									</Text>
 								)}
 							</View>

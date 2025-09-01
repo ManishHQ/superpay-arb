@@ -93,7 +93,10 @@ export default function PaymentScreen() {
 			}
 		};
 
-		const subscription = AppState.addEventListener('change', handleAppStateChange);
+		const subscription = AppState.addEventListener(
+			'change',
+			handleAppStateChange
+		);
 		return () => subscription?.remove();
 	}, []);
 
@@ -106,7 +109,6 @@ export default function PaymentScreen() {
 		setScanResult(null);
 		setIsScanning(true); // Re-enable scanning
 	};
-
 
 	// Generate default QR code (for receiving payments)
 	const generateDefaultQR = () => {
@@ -515,12 +517,17 @@ export default function PaymentScreen() {
 						)}
 
 						{/* Camera Loading State */}
-						{!scanResult && mode === 'scan' && permission?.granted && !isCameraReady && (
-							<View className='absolute inset-0 z-20 items-center justify-center bg-black'>
-								<ActivityIndicator size='large' color='#ffffff' />
-								<Text className='mt-4 text-white'>Initializing Camera...</Text>
-							</View>
-						)}
+						{!scanResult &&
+							mode === 'scan' &&
+							permission?.granted &&
+							!isCameraReady && (
+								<View className='absolute inset-0 z-20 items-center justify-center bg-black'>
+									<ActivityIndicator size='large' color='#ffffff' />
+									<Text className='mt-4 text-white'>
+										Initializing Camera...
+									</Text>
+								</View>
+							)}
 
 						{/* Scan Mode Overlay */}
 						<View className='absolute inset-0 z-10 items-center justify-center'>
@@ -544,21 +551,10 @@ export default function PaymentScreen() {
 								/>
 							</View>
 							<Text className='z-20 text-base text-white'>
-								{isCameraReady 
+								{isCameraReady
 									? 'Point your camera at a QR code to pay'
 									: 'Preparing camera...'}
 							</Text>
-							
-							{/* Debug info - remove in production */}
-							{__DEV__ && (
-								<View className='absolute bottom-10 left-4 right-4 p-2 bg-black/50 rounded'>
-									<Text className='text-xs text-white'>
-										Debug: Camera Ready: {isCameraReady ? 'Yes' : 'No'} | 
-										Scanning: {isScanning ? 'Yes' : 'No'} | 
-										Mode: {mode}
-									</Text>
-								</View>
-							)}
 						</View>
 					</View>
 				) : (

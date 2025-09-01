@@ -436,22 +436,6 @@ export default function WaitlistPage() {
 									/>
 								</View>
 							</View>
-
-							{/* Referral Input (Optional) */}
-							<View>
-								<Text className='mb-2 text-sm font-semibold text-gray-700'>
-									How did you hear about us? (Optional)
-								</Text>
-								<View className='px-4 py-3 border border-gray-200 bg-gray-50 rounded-xl focus:border-blue-500'>
-									<TextInput
-										value={referral}
-										onChangeText={setReferral}
-										placeholder='Social media, friend, etc.'
-										placeholderTextColor='#9CA3AF'
-										className='text-base text-gray-900'
-									/>
-								</View>
-							</View>
 						</View>
 
 						{/* Submit Button */}
@@ -476,6 +460,31 @@ export default function WaitlistPage() {
 							)}
 						</TouchableOpacity>
 
+						<View className='mt-4'>
+							{/* Add a note with test credential */}
+							<View className='text-sm text-gray-600'>
+								User credentials:
+								<View className='ml-4'>
+									<Text className='text-blue-600'>
+										Email: test+dynamic_test@gmail.com
+									</Text>
+									<Text className='text-blue-600'>OTP: 807512</Text>
+								</View>
+							</View>
+							{/* Add a note with test credential */}
+							<View className='text-sm text-gray-600'>
+								<Text className='text-sm text-gray-600'>
+									Business credentials:
+								</Text>
+								<View className='ml-4'>
+									<Text className='text-blue-600'>
+										Email: test1+dynamic_test@gmail.com
+									</Text>
+									<Text className='text-blue-600'>OTP: 807512</Text>
+								</View>
+							</View>
+						</View>
+
 						<TouchableOpacity
 							onPress={() => {
 								router.push('/login');
@@ -483,6 +492,18 @@ export default function WaitlistPage() {
 							className='items-center py-4'
 						>
 							<Text className='text-lg font-bold text-blue'>Try the demo</Text>
+						</TouchableOpacity>
+
+						{/* Expo QR Code Link */}
+						<TouchableOpacity
+							onPress={() => {
+								router.push('/expo-qr');
+							}}
+							className='items-center py-2'
+						>
+							<Text className='text-base font-medium text-gray-600 hover:text-blue-600'>
+								📱 Open in Expo Go
+							</Text>
 						</TouchableOpacity>
 
 						{/* Social Proof */}

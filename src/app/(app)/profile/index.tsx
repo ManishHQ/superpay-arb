@@ -511,9 +511,9 @@ export default function ProfileScreen() {
 				</View>
 
 				{/* Cards Container - Responsive Layout */}
-				<View className='px-4 mb-6'>
+				<View className='flex-row gap-4 px-4 mb-6'>
 					{/* SuperPay Card Section */}
-					<View className='mb-6 md:mb-8'>
+					<View className='flex-1 w-1/2 mb-6 md:mb-8'>
 						<View
 							className='relative mx-auto md:max-w-md lg:max-w-lg'
 							style={{
@@ -749,9 +749,8 @@ export default function ProfileScreen() {
 							</LinearGradient>
 						</View>
 					</View>
-
-					{/* Quick Stats Card */}
-					<View className='mb-6 md:mb-8'>
+					{/* Activity Card - Left Side */}
+					<View className='flex-1 w-1/2 mb-6 lg:mb-0'>
 						<LinearGradient
 							colors={['#3D5AFE', '#00C896']}
 							start={{ x: 0, y: 0 }}
@@ -759,9 +758,7 @@ export default function ProfileScreen() {
 							style={{
 								padding: 20,
 								borderRadius: 16,
-								marginHorizontal: 'auto',
-								maxWidth: 600,
-								width: '100%',
+								height: '100%',
 							}}
 							className='md:p-6'
 						>
@@ -791,33 +788,33 @@ export default function ProfileScreen() {
 								</TouchableOpacity>
 							</View>
 
-							{/* Stats Grid - Responsive Layout */}
-							<View className='md:max-w-lg md:mx-auto'>
-								<View className='flex-row justify-between mb-4 md:mb-6'>
+							{/* Stats Grid */}
+							<View className='space-y-4'>
+								<View className='flex-row justify-between'>
 									<View
-										className='flex-1 p-4 mr-2 rounded-xl md:p-6 md:mr-3'
+										className='flex-1 p-3 mr-2 rounded-xl'
 										style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
 									>
-										<Text className='text-2xl font-bold text-white md:text-3xl'>
+										<Text className='text-xl font-bold text-white'>
 											{userStats.totalTransactions}
 										</Text>
 										<Text
 											style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-											className='text-sm md:text-base'
+											className='text-sm'
 										>
 											Transactions
 										</Text>
 									</View>
 									<View
-										className='flex-1 p-4 ml-2 rounded-xl md:p-6 md:ml-3'
+										className='flex-1 p-3 ml-2 rounded-xl'
 										style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
 									>
-										<Text className='text-2xl font-bold text-white md:text-3xl'>
+										<Text className='text-xl font-bold text-white'>
 											{userStats.activeGroups}
 										</Text>
 										<Text
 											style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-											className='text-sm md:text-base'
+											className='text-sm'
 										>
 											Active Groups
 										</Text>
@@ -825,31 +822,31 @@ export default function ProfileScreen() {
 								</View>
 								<View className='flex-row justify-between'>
 									<View
-										className='flex-1 p-4 mr-2 rounded-xl md:p-6 md:mr-3'
+										className='flex-1 p-3 mr-2 rounded-xl'
 										style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
 									>
-										<Text className='text-2xl font-bold text-white md:text-3xl'>
+										<Text className='text-xl font-bold text-white'>
 											{userStats.friendsConnected}
 										</Text>
 										<Text
 											style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-											className='text-sm md:text-base'
+											className='text-sm'
 										>
 											Friends
 										</Text>
 									</View>
 									<View
-										className='flex-1 p-4 ml-2 rounded-xl md:p-6 md:ml-3'
+										className='flex-1 p-3 ml-2 rounded-xl'
 										style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
 									>
-										<Text className='text-2xl font-bold text-white md:text-3xl'>
+										<Text className='text-xl font-bold text-white'>
 											{portfolioVisible
 												? `$${userStats.portfolioValue.toLocaleString()}`
 												: '•••••'}
 										</Text>
 										<Text
 											style={{ color: 'rgba(255, 255, 255, 0.9)' }}
-											className='text-sm md:text-base'
+											className='text-sm'
 										>
 											Portfolio Value
 										</Text>
@@ -860,471 +857,163 @@ export default function ProfileScreen() {
 					</View>
 				</View>
 
-				{/* Profile Edit Section */}
-				<View className='p-6 mb-6 bg-white shadow-sm rounded-2xl md:p-8 md:max-w-2xl md:mx-auto'>
-					<Text className='mb-6 text-xl font-semibold text-gray-900 md:text-2xl md:text-center'>
-						Profile Information
-					</Text>
-
-					{/* Avatar Section */}
-					<View className='items-center mb-6'>
-						<View className='relative mb-4'>
-							<Image
-								source={{ uri: getCacheBustedAvatarUrl() }}
-								style={{
-									width: 100,
-									height: 100,
-									borderRadius: 50,
-									backgroundColor: '#f3f4f6',
-								}}
-								contentFit='cover'
-							/>
-							<TouchableOpacity
-								className='absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full items-center justify-center border-3 border-white'
-								onPress={handleAvatarPress}
-								disabled={isUploadingAvatar}
-							>
-								{isUploadingAvatar ? (
-									<ActivityIndicator size='small' color='white' />
-								) : (
-									<Ionicons name='camera' size={16} color='white' />
-								)}
-							</TouchableOpacity>
-						</View>
-						<Text className='text-sm text-gray-600 text-center'>
-							Tap to update your profile photo
-						</Text>
-					</View>
-
-					{/* Profile Form */}
-					<View className='space-y-4'>
-						{/* Full Name */}
-						<View className='mb-4'>
-							<Text className='mb-2 text-sm font-medium text-gray-700'>
-								Full Name
+				<View className='flex-col mb-6 lg:flex-row lg:gap-8 lg:items-start'>
+					{/* Profile Information - Right Side */}
+					<View className='flex-1'>
+						<View className='p-6 bg-white shadow-sm rounded-2xl md:p-8'>
+							<Text className='mb-6 text-xl font-semibold text-gray-900 md:text-2xl md:text-center'>
+								Profile Information
 							</Text>
-							<TextInput
-								className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
-								value={editableProfile.full_name}
-								onChangeText={(value) =>
-									setEditableProfile({ ...editableProfile, full_name: value })
-								}
-								placeholder='Enter your full name'
-								placeholderTextColor='#9ca3af'
-							/>
-						</View>
 
-						{/* Username */}
-						<View className='mb-4'>
-							<Text className='mb-2 text-sm font-medium text-gray-700'>
-								Username
-							</Text>
-							<TextInput
-								className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
-								value={editableProfile.username}
-								onChangeText={(value) =>
-									setEditableProfile({ ...editableProfile, username: value })
-								}
-								placeholder='Enter your username'
-								placeholderTextColor='#9ca3af'
-								autoCapitalize='none'
-							/>
-						</View>
-
-						{/* Email */}
-						<View className='mb-4'>
-							<Text className='mb-2 text-sm font-medium text-gray-700'>
-								Email
-							</Text>
-							<TextInput
-								className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
-								value={editableProfile.email}
-								onChangeText={(value) =>
-									setEditableProfile({ ...editableProfile, email: value })
-								}
-								placeholder='Enter your email'
-								placeholderTextColor='#9ca3af'
-								keyboardType='email-address'
-								autoCapitalize='none'
-							/>
-						</View>
-
-						{/* Bio */}
-						<View className='mb-4'>
-							<Text className='mb-2 text-sm font-medium text-gray-700'>
-								Bio
-							</Text>
-							<TextInput
-								className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
-								value={editableProfile.bio}
-								onChangeText={(value) =>
-									setEditableProfile({ ...editableProfile, bio: value })
-								}
-								placeholder='Tell us about yourself...'
-								placeholderTextColor='#9ca3af'
-								multiline
-								numberOfLines={3}
-								textAlignVertical='top'
-								style={{ minHeight: 80 }}
-							/>
-						</View>
-
-						{/* Save Button */}
-						<TouchableOpacity
-							className={`flex-row items-center justify-center w-full p-4 mt-6 rounded-lg ${
-								isSavingProfile ? 'bg-gray-400' : 'bg-blue-600'
-							}`}
-							onPress={handleSaveProfile}
-							disabled={isSavingProfile}
-						>
-							{isSavingProfile ? (
-								<ActivityIndicator size='small' color='white' />
-							) : (
-								<Ionicons name='checkmark-circle' size={20} color='white' />
-							)}
-							<Text className='ml-2 text-base font-semibold text-white'>
-								{isSavingProfile ? 'Saving...' : 'Save Profile'}
-							</Text>
-						</TouchableOpacity>
-					</View>
-				</View>
-
-				{/* Recent Transactions Section */}
-				<View className='p-6 mb-6 bg-white shadow-sm rounded-2xl md:p-8 md:max-w-2xl md:mx-auto'>
-					<View className='flex-row items-center justify-between mb-4'>
-						<Text className='text-xl font-semibold text-gray-900 md:text-2xl'>
-							Recent Activity
-						</Text>
-						{isLoadingData && (
-							<ActivityIndicator size='small' color='#3b82f6' />
-						)}
-					</View>
-
-					{transactions.length > 0 ? (
-						<View className='space-y-3'>
-							{transactions.slice(0, 5).map((transaction, index) => {
-								const isReceived =
-									transaction.to_user_id === currentProfile?.id;
-								const otherUser = isReceived
-									? transaction.from_user
-									: transaction.to_user;
-								const amount =
-									typeof transaction.amount === 'string'
-										? parseFloat(transaction.amount)
-										: transaction.amount || 0;
-
-								return (
-									<View
-										key={transaction.id}
-										className='flex-row items-center justify-between p-3 bg-gray-50 rounded-lg'
+							{/* Avatar Section */}
+							<View className='items-center mb-6'>
+								<View className='relative mb-4'>
+									<Image
+										source={{ uri: getCacheBustedAvatarUrl() }}
+										style={{
+											width: 100,
+											height: 100,
+											borderRadius: 50,
+											backgroundColor: '#f3f4f6',
+										}}
+										contentFit='cover'
+									/>
+									<TouchableOpacity
+										className='absolute bottom-0 right-0 items-center justify-center w-8 h-8 bg-blue-600 border-white rounded-full border-3'
+										onPress={handleAvatarPress}
+										disabled={isUploadingAvatar}
 									>
-										<View className='flex-row items-center flex-1'>
-											<View
-												className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
-													isReceived ? 'bg-green-100' : 'bg-red-100'
-												}`}
-											>
-												<Ionicons
-													name={isReceived ? 'arrow-down' : 'arrow-up'}
-													size={16}
-													color={isReceived ? '#10b981' : '#ef4444'}
-												/>
-											</View>
-											<View className='flex-1'>
-												<Text className='font-medium text-gray-900'>
-													{isReceived ? 'Received from' : 'Sent to'}{' '}
-													{otherUser?.display_name ||
-														otherUser?.username ||
-														'Unknown'}
-												</Text>
-												<Text className='text-sm text-gray-500'>
-													{new Date(
-														transaction.created_at
-													).toLocaleDateString()}
-												</Text>
-											</View>
-										</View>
-										<Text
-											className={`font-semibold ${
-												isReceived ? 'text-green-600' : 'text-red-600'
-											}`}
-										>
-											{isReceived ? '+' : '-'}${amount.toFixed(2)}
-										</Text>
-									</View>
-								);
-							})}
+										{isUploadingAvatar ? (
+											<ActivityIndicator size='small' color='white' />
+										) : (
+											<Ionicons name='camera' size={16} color='white' />
+										)}
+									</TouchableOpacity>
+								</View>
+								<Text className='text-sm text-center text-gray-600'>
+									Tap to update your profile photo
+								</Text>
+							</View>
 
-							{transactions.length > 5 && (
+							{/* Profile Form */}
+							<View className='space-y-4'>
+								{/* Full Name */}
+								<View className='mb-4'>
+									<Text className='mb-2 text-sm font-medium text-gray-700'>
+										Full Name
+									</Text>
+									<TextInput
+										className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
+										value={editableProfile.full_name}
+										onChangeText={(value) =>
+											setEditableProfile({
+												...editableProfile,
+												full_name: value,
+											})
+										}
+										placeholder='Enter your full name'
+										placeholderTextColor='#9ca3af'
+									/>
+								</View>
+
+								{/* Username */}
+								<View className='mb-4'>
+									<Text className='mb-2 text-sm font-medium text-gray-700'>
+										Username
+									</Text>
+									<TextInput
+										className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
+										value={editableProfile.username}
+										onChangeText={(value) =>
+											setEditableProfile({
+												...editableProfile,
+												username: value,
+											})
+										}
+										placeholder='Enter your username'
+										placeholderTextColor='#9ca3af'
+										autoCapitalize='none'
+									/>
+								</View>
+
+								{/* Email */}
+								<View className='mb-4'>
+									<Text className='mb-2 text-sm font-medium text-gray-700'>
+										Email
+									</Text>
+									<TextInput
+										className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
+										value={editableProfile.email}
+										onChangeText={(value) =>
+											setEditableProfile({
+												...editableProfile,
+												email: value,
+											})
+										}
+										placeholder='Enter your email'
+										placeholderTextColor='#9ca3af'
+										keyboardType='email-address'
+										autoCapitalize='none'
+									/>
+								</View>
+
+								{/* Bio */}
+								<View className='mb-4'>
+									<Text className='mb-2 text-sm font-medium text-gray-700'>
+										Bio
+									</Text>
+									<TextInput
+										className='w-full p-3 border border-gray-300 rounded-lg bg-gray-50'
+										value={editableProfile.bio}
+										onChangeText={(value) =>
+											setEditableProfile({
+												...editableProfile,
+												bio: value,
+											})
+										}
+										placeholder='Tell us about yourself...'
+										placeholderTextColor='#9ca3af'
+										multiline
+										numberOfLines={3}
+										textAlignVertical='top'
+										style={{ minHeight: 80 }}
+									/>
+								</View>
+
+								{/* Save Button */}
 								<TouchableOpacity
-									className='p-3 bg-blue-50 rounded-lg items-center'
-									onPress={() => router.push('/(app)/track')}
+									className={`flex-row items-center justify-center w-full p-4 mt-6 rounded-lg ${
+										isSavingProfile ? 'bg-gray-400' : 'bg-blue-600'
+									}`}
+									onPress={handleSaveProfile}
+									disabled={isSavingProfile}
 								>
-									<Text className='text-blue-600 font-medium'>
-										View All Transactions ({transactions.length})
+									{isSavingProfile ? (
+										<ActivityIndicator size='small' color='white' />
+									) : (
+										<Ionicons name='checkmark-circle' size={20} color='white' />
+									)}
+									<Text className='ml-2 text-base font-semibold text-white'>
+										{isSavingProfile ? 'Saving...' : 'Save Profile'}
 									</Text>
 								</TouchableOpacity>
-							)}
-						</View>
-					) : (
-						<View className='items-center py-8'>
-							<Ionicons name='receipt-outline' size={48} color='#d1d5db' />
-							<Text className='mt-3 text-gray-500'>No recent transactions</Text>
-							<Text className='text-sm text-gray-400'>
-								Your transaction history will appear here
-							</Text>
-						</View>
-					)}
-				</View>
-
-				{/* Primary Actions Section */}
-				<View className='p-6 mb-6 bg-white shadow-sm rounded-2xl md:p-8 md:max-w-2xl md:mx-auto'>
-					<Text className='mb-6 text-xl font-semibold text-gray-900 md:text-2xl md:text-center'>
-						Quick Actions
-					</Text>
-					<View>
-						<View className='flex-row justify-between mb-4 md:mb-6'>
-							<TouchableOpacity
-								className='flex-row items-center flex-1 p-4 mr-2 bg-gray-50 rounded-xl md:p-6 md:mr-3'
-								onPress={handleEditProfile}
-							>
-								<Ionicons name='person-circle' size={24} color='#3D5AFE' />
-								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700 md:text-base'>
-									Edit Profile
-								</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								className='flex-row items-center flex-1 p-4 ml-2 bg-gray-50 rounded-xl md:p-6 md:ml-3'
-								onPress={handleShareProfile}
-							>
-								<Ionicons name='share' size={24} color='#3D5AFE' />
-								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700 md:text-base'>
-									Share Profile
-								</Text>
-							</TouchableOpacity>
-						</View>
-						<View className='flex-row justify-between'>
-							<TouchableOpacity
-								className='flex-row items-center flex-1 p-4 mr-2 bg-gray-50 rounded-xl md:p-6 md:mr-3'
-								onPress={handleQRCode}
-							>
-								<Ionicons name='qr-code' size={24} color='#3D5AFE' />
-								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700 md:text-base'>
-									Generate QR
-								</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								className='flex-row items-center flex-1 p-4 ml-2 bg-gray-50 rounded-xl md:p-6 md:ml-3'
-								onPress={handlePrivacySettings}
-							>
-								<Ionicons name='shield-checkmark' size={24} color='#3D5AFE' />
-								<Text className='flex-1 ml-2 text-sm font-medium text-gray-700 md:text-base'>
-									Privacy
-								</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-				</View>
-
-				{/* Account Management */}
-				<View className='p-8 mb-6 bg-white shadow-sm rounded-2xl'>
-					<Text className='mb-6 text-xl font-semibold text-gray-900'>
-						Account Management
-					</Text>
-					<View className='space-y-2'>
-						{[
-							{
-								icon: 'wallet',
-								title: 'USDC Balance',
-								subtitle: currentBalance ? `$${currentBalance}` : '$0.00',
-							},
-							{
-								icon: 'card',
-								title: 'Payment Methods',
-								subtitle: currentProfile
-									? '1 wallet connected'
-									: 'No wallet connected',
-							},
-							{
-								icon: 'shield-checkmark',
-								title: 'Security Settings',
-								subtitle: 'Magic.link enabled',
-							},
-							{
-								icon: 'logo-google',
-								title: 'Connected Accounts',
-								subtitle: '3 social accounts',
-							},
-							{
-								icon: 'document-text',
-								title: 'Export Data',
-								subtitle: 'Download statements',
-								action: handleExportData,
-							},
-							{
-								icon: 'checkmark-circle',
-								title: 'Account Verification',
-								subtitle: 'Verified account',
-							},
-						].map((item, index) => (
-							<TouchableOpacity
-								key={index}
-								className='flex-row items-center justify-between py-4 border-b border-gray-100 last:border-b-0'
-								onPress={item.action}
-							>
-								<View className='flex-row items-center'>
-									<Ionicons name={item.icon as any} size={24} color='#3D5AFE' />
-									<View className='ml-4'>
-										<Text className='text-base font-medium text-gray-900'>
-											{item.title}
-										</Text>
-										<Text className='text-sm text-gray-500'>
-											{item.subtitle}
-										</Text>
-									</View>
-								</View>
-								<Ionicons name='chevron-forward' size={20} color='#E0E0E0' />
-							</TouchableOpacity>
-						))}
-					</View>
-				</View>
-
-				{/* App Settings & Preferences */}
-				<View className='p-8 mb-6 bg-white shadow-sm rounded-2xl'>
-					<Text className='mb-6 text-xl font-semibold text-gray-900'>
-						Preferences
-					</Text>
-					<View className='space-y-2'>
-						{[
-							{
-								icon: 'moon',
-								title: 'Dark Mode',
-								type: 'toggle',
-								value: darkMode,
-								setter: setDarkMode,
-							},
-							{
-								icon: 'notifications',
-								title: 'Notifications',
-								type: 'toggle',
-								value: notifications,
-								setter: setNotifications,
-							},
-							{
-								icon: 'finger-print',
-								title: 'Biometric Login',
-								type: 'toggle',
-								value: biometric,
-								setter: setBiometric,
-							},
-							{
-								icon: 'people',
-								title: 'Auto-Split Groups',
-								type: 'toggle',
-								value: autoSplit,
-								setter: setAutoSplit,
-							},
-							{ icon: 'card', title: 'Currency Settings', subtitle: 'USD ($)' },
-							{ icon: 'language', title: 'Language', subtitle: 'English' },
-						].map((item, index) => (
-							<View
-								key={index}
-								className='flex-row items-center justify-between py-4 border-b border-gray-100 last:border-b-0'
-							>
-								<View className='flex-row items-center'>
-									<Ionicons name={item.icon as any} size={24} color='#3D5AFE' />
-									<View className='ml-4'>
-										<Text className='text-base font-medium text-gray-900'>
-											{item.title}
-										</Text>
-										{item.subtitle && (
-											<Text className='text-sm text-gray-500'>
-												{item.subtitle}
-											</Text>
-										)}
-									</View>
-								</View>
-								{item.type === 'toggle' ? (
-									<Switch
-										value={item.value}
-										onValueChange={item.setter}
-										trackColor={{ false: '#E0E0E0', true: '#3D5AFE' }}
-										thumbColor='#FFFFFF'
-									/>
-								) : (
-									<Ionicons name='chevron-forward' size={20} color='#E0E0E0' />
-								)}
 							</View>
-						))}
-					</View>
-				</View>
-
-				{/* Support & Information */}
-				<View className='p-8 mb-6 bg-white shadow-sm rounded-2xl'>
-					<Text className='mb-6 text-xl font-semibold text-gray-900'>
-						Support & Information
-					</Text>
-					<View className='space-y-2'>
-						{[
-							{
-								icon: 'help-circle',
-								title: 'Help Center',
-								subtitle: 'FAQs and guides',
-							},
-							{
-								icon: 'chatbubble-ellipses',
-								title: 'Contact Support',
-								subtitle: '24/7 assistance',
-								action: handleSupport,
-							},
-							{
-								icon: 'bulb',
-								title: 'Feature Requests',
-								subtitle: 'Share your ideas',
-							},
-							{
-								icon: 'document-text',
-								title: 'Terms of Service',
-								subtitle: 'Legal information',
-							},
-							{
-								icon: 'shield',
-								title: 'Privacy Policy',
-								subtitle: 'How we protect you',
-							},
-						].map((item, index) => (
-							<TouchableOpacity
-								key={index}
-								className='flex-row items-center justify-between py-4 border-b border-gray-100 last:border-b-0'
-								onPress={item.action}
-							>
-								<View className='flex-row items-center'>
-									<Ionicons name={item.icon as any} size={24} color='#3D5AFE' />
-									<View className='ml-4'>
-										<Text className='text-base font-medium text-gray-900'>
-											{item.title}
-										</Text>
-										<Text className='text-sm text-gray-500'>
-											{item.subtitle}
-										</Text>
-									</View>
-								</View>
-								<Ionicons name='chevron-forward' size={20} color='#E0E0E0' />
-							</TouchableOpacity>
-						))}
+						</View>
 					</View>
 				</View>
 
 				{/* Logout Button */}
-				<TouchableOpacity
-					className='flex-row items-center justify-center p-6 mb-24 bg-red-500 rounded-2xl'
-					onPress={handleLogout}
-				>
-					<Ionicons name='log-out' size={24} color='white' />
-					<Text className='ml-3 text-xl font-semibold text-white'>
-						Sign Out
-					</Text>
-				</TouchableOpacity>
+				<View className='md:max-w-4xl md:mx-auto'>
+					<TouchableOpacity
+						className='flex-row items-center justify-center p-6 mb-24 shadow-lg bg-gradient-to-r from-red-500 to-red-600 rounded-2xl'
+						onPress={handleLogout}
+					>
+						<Ionicons name='log-out' size={24} color='white' />
+						<Text className='ml-3 text-xl font-semibold text-white'>
+							Sign Out
+						</Text>
+					</TouchableOpacity>
+				</View>
 			</ScrollView>
 		</SafeAreaView>
 	);

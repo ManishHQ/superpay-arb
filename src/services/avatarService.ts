@@ -367,8 +367,8 @@ export class AvatarService {
 	 */
 	static generateDefaultAvatar(username: string, seed?: string): string {
 		const avatarSeed = seed || username || 'default';
-		// Using DiceBear avataaars style
-		return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(avatarSeed)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+		// Using DiceBear avataaars style with higher quality settings
+		return `https://api.dicebear.com/7.x/avataaars/png?seed=${encodeURIComponent(avatarSeed)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf&size=200&radius=50`;
 	}
 
 	/**
