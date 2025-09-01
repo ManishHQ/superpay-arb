@@ -23,6 +23,10 @@ import { dynamicClient } from '@/lib/client';
 import { Wallet } from '@dynamic-labs/client';
 import { useWalletStore } from '@/stores/walletStore';
 import { useBalanceStore, useBalanceInvalidation } from '@/stores/balanceStore';
+import {
+	TransactionService,
+	TransactionWithUsers,
+} from '@/services/transactionService';
 import { router } from 'expo-router';
 
 // Default data fallbacks
@@ -62,36 +66,6 @@ const mockWeeklyStats = {
 	transactions: 12,
 };
 
-const mockRecentActivity = [
-	{
-		id: '1',
-		name: 'Sarah Wilson',
-		avatar: 'https://i.pravatar.cc/150?img=1',
-		amount: 25.5,
-		type: 'sent' as const,
-		note: 'Coffee ☕',
-		time: '2 hours ago',
-	},
-	{
-		id: '2',
-		name: 'Mike Chen',
-		avatar: 'https://i.pravatar.cc/150?img=2',
-		amount: 45.0,
-		type: 'received' as const,
-		note: 'Lunch 🍕',
-		time: '4 hours ago',
-	},
-	{
-		id: '3',
-		name: 'Emma Davis',
-		avatar: 'https://i.pravatar.cc/150?img=3',
-		amount: 12.75,
-		type: 'sent' as const,
-		note: 'Uber ride 🚕',
-		time: '1 day ago',
-	},
-];
-
 // Quick actions configuration - will be defined inside component to access refs
 
 export default function HomeScreen() {
@@ -104,6 +78,8 @@ export default function HomeScreen() {
 	const [dynamicStats, setDynamicStats] = useState(mockWeeklyStats);
 	const [userData, setUserData] = useState(defaultUser);
 	const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
+	const [recentActivity, setRecentActivity] = useState<any[]>([]);
+	const [activityLoading, setActivityLoading] = useState(false);
 
 	// Modal states
 	const [sendModalVisible, setSendModalVisible] = useState(false);
@@ -188,6 +164,13 @@ export default function HomeScreen() {
 		}
 	}, [walletAddress, isWalletConnected, fetchBalances]);
 
+	// Fetch recent activity when wallet connects
+	useEffect(() => {
+		if (walletAddress && isWalletConnected) {
+			fetchRecentActivity();
+		}
+	}, [walletAddress, isWalletConnected]);
+
 	// Monitor app state changes for smart balance refreshing
 	useEffect(() => {
 		if (!walletAddress) return;
@@ -266,6 +249,71 @@ export default function HomeScreen() {
 			console.error('Error during manual refresh:', error);
 		} finally {
 			setIsLoading(false);
+		}
+	};
+
+	// Fetch recent activity data
+	const fetchRecentActivity = async () => {
+		if (!walletAddress) return;
+
+		setActivityLoading(true);
+		try {
+			const transactions = await TransactionService.getUserTransactions(5); // Get last 5 transactions
+
+			// Transform transactions to activity format
+			const activities = transactions.map((transaction) => {
+				const currentUserProfile =
+					transaction.from_user?.wallet_address === walletAddress
+						? transaction.from_user
+						: transaction.to_user;
+				const otherUser =
+					transaction.from_user?.wallet_address === walletAddress
+						? transaction.to_user
+						: transaction.from_user;
+
+				const isSent = transaction.from_user?.wallet_address === walletAddress;
+
+				// Generate a consistent avatar based on user ID if no avatar_url
+				const generateAvatar = (username: string) => {
+					return `https://api.dicebear.com/9.x/adventurer-neutral/svg?seed=${username}`;
+				};
+
+				return {
+					id: transaction.id,
+					name: otherUser?.full_name || otherUser?.username || 'Unknown User',
+					avatar:
+						otherUser?.avatar_url ||
+						generateAvatar(otherUser?.username || 'Unknown User'),
+					amount: transaction.amount,
+					type: isSent ? ('sent' as const) : ('received' as const),
+					note:
+						transaction.note || (isSent ? 'Payment sent' : 'Payment received'),
+					time: formatTimeAgo(new Date(transaction.created_at)),
+				};
+			});
+
+			setRecentActivity(activities);
+		} catch (error) {
+			console.error('Error fetching recent activity:', error);
+		} finally {
+			setActivityLoading(false);
+		}
+	};
+
+	// Helper function to format time ago
+	const formatTimeAgo = (date: Date) => {
+		const now = new Date();
+		const diffInMs = now.getTime() - date.getTime();
+		const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+		const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+		const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+		if (diffInMinutes < 60) {
+			return diffInMinutes <= 1 ? 'Just now' : `${diffInMinutes} minutes ago`;
+		} else if (diffInHours < 24) {
+			return diffInHours === 1 ? '1 hour ago' : `${diffInHours} hours ago`;
+		} else {
+			return diffInDays === 1 ? '1 day ago' : `${diffInDays} days ago`;
 		}
 	};
 
@@ -364,6 +412,7 @@ export default function HomeScreen() {
 			// Force refresh balances after sending
 			setTimeout(() => {
 				fetchBalances(walletAddress, true);
+				fetchRecentActivity(); // Also refresh recent activity
 			}, 2000); // Wait 2 seconds for transaction to be confirmed
 		}
 
@@ -462,7 +511,7 @@ export default function HomeScreen() {
 
 				{/* Recent Activity */}
 				<RecentActivity
-					activities={mockRecentActivity}
+					activities={recentActivity}
 					onViewAll={handleViewAllActivity}
 					className='web:mb-8'
 				/>

@@ -130,10 +130,22 @@ export default function BusinessLayout() {
 			iconOutline: 'people-outline',
 		},
 		{
-			name: 'requests/index',
-			title: 'Payment Requests',
+			name: 'payments/index',
+			title: 'Payments',
 			icon: 'card',
 			iconOutline: 'card-outline',
+		},
+		{
+			name: 'offers/index',
+			title: 'Offers',
+			icon: 'gift',
+			iconOutline: 'gift-outline',
+		},
+		{
+			name: 'loyalty/index',
+			title: 'Loyalty',
+			icon: 'medal',
+			iconOutline: 'medal-outline',
 		},
 		{
 			name: 'transactions/index',

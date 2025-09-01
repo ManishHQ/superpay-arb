@@ -26,6 +26,7 @@ import {
 } from '@/stores/savingsPotsStore';
 import { useWalletStore } from '@/stores/walletStore';
 import { useBalanceStore } from '@/stores/balanceStore';
+import { useUserProfileStore } from '@/stores/userProfileStore';
 import { UserProfileService } from '@/services/userProfileService';
 import { UserProfile } from '@/types/supabase';
 
@@ -47,11 +48,15 @@ export default function ActivityScreen() {
 		getProgressPercentage,
 		updateYieldStrategies,
 		setGlobalAutoInvest,
+		loadUserPots,
 	} = useSavingsPotsStore();
 
 	// Wallet store
 	const { address: walletAddress, isConnected } = useWalletStore();
 	const { getBalance } = useBalanceStore();
+
+	// User profile store
+	const { currentProfile, loadProfileByWallet } = useUserProfileStore();
 
 	// Safe area insets for proper spacing
 	const insets = useSafeAreaInsets();
@@ -65,7 +70,6 @@ export default function ActivityScreen() {
 	const [showPotDetailModal, setShowPotDetailModal] = useState(false);
 	const [selectedPot, setSelectedPot] = useState<SavingsPot | null>(null);
 	const [fundAmount, setFundAmount] = useState('');
-
 
 	// Custom pot creation state
 	const [customPotName, setCustomPotName] = useState('');
@@ -87,6 +91,27 @@ export default function ActivityScreen() {
 	// Get wallet balance
 	const usdcBalance = walletAddress ? getBalance(walletAddress, 'usdc') : null;
 	const availableBalance = parseFloat(usdcBalance?.formatted || '0');
+
+	// Load pots from database when component mounts
+	useEffect(() => {
+		if (walletAddress) {
+			loadUserPots();
+		}
+	}, [walletAddress]);
+
+	// Load pots when wallet connects
+	useEffect(() => {
+		if (isConnected && walletAddress) {
+			loadUserPots();
+		}
+	}, [isConnected, walletAddress]);
+
+	// Load user profile when wallet connects
+	useEffect(() => {
+		if (walletAddress) {
+			loadProfileByWallet(walletAddress);
+		}
+	}, [walletAddress]);
 
 	// Filter pots based on search and category
 	const filteredPots = getActivePots().filter((pot) => {
@@ -220,6 +245,7 @@ export default function ActivityScreen() {
 		setRefreshing(true);
 		try {
 			await updateYieldStrategies();
+			await loadUserPots();
 		} finally {
 			setRefreshing(false);
 		}
@@ -233,7 +259,7 @@ export default function ActivityScreen() {
 		setCustomPotIcon(template.icon);
 		setCustomPotColor(template.color);
 		setCustomPotTarget(template.targetAmount.toString());
-		
+
 		// Navigate to custom creation modal
 		setShowCreateModal(false);
 		setShowCustomModal(true);
@@ -280,7 +306,7 @@ export default function ActivityScreen() {
 	// Handle user search
 	const handleUserSearch = async (searchTerm: string) => {
 		setCurrentInviteUsername(searchTerm);
-		
+
 		if (searchTerm.trim().length < 2) {
 			setSearchResults([]);
 			setIsSearching(false);
@@ -292,7 +318,7 @@ export default function ActivityScreen() {
 			const results = await UserProfileService.searchUsers(searchTerm, 5);
 			// Filter out already invited users
 			const filteredResults = results.filter(
-				user => !invitedUsers.some(invited => invited.id === user.id)
+				(user) => !invitedUsers.some((invited) => invited.id === user.id)
 			);
 			setSearchResults(filteredResults);
 		} catch (error) {
@@ -305,7 +331,7 @@ export default function ActivityScreen() {
 
 	// Handle adding user to pot
 	const handleAddUserToPot = (user: UserProfile) => {
-		if (!invitedUsers.some(invited => invited.id === user.id)) {
+		if (!invitedUsers.some((invited) => invited.id === user.id)) {
 			setInvitedUsers([...invitedUsers, user]);
 			setCurrentInviteUsername('');
 			setSearchResults([]);
@@ -314,7 +340,7 @@ export default function ActivityScreen() {
 
 	// Handle removing user from pot
 	const handleRemoveUserFromPot = (userId: string) => {
-		setInvitedUsers(invitedUsers.filter(user => user.id !== userId));
+		setInvitedUsers(invitedUsers.filter((user) => user.id !== userId));
 	};
 
 	// Handle date picker change
@@ -350,9 +376,12 @@ export default function ActivityScreen() {
 			category: 'custom' as const,
 			isYieldEnabled: false,
 			isStrict: isStrictPot,
-			strictDeadline: isStrictPot && strictDeadline ? strictDeadline : undefined,
+			strictDeadline:
+				isStrictPot && strictDeadline ? strictDeadline : undefined,
 			isJoint: isJointPot,
-			invitedUsers: isJointPot ? invitedUsers.map(user => user.username) : undefined,
+			invitedUsers: isJointPot
+				? invitedUsers.map((user) => user.username)
+				: undefined,
 		};
 
 		createPot(customPotData);
@@ -385,26 +414,36 @@ export default function ActivityScreen() {
 		}
 	};
 
-
-
 	// Calculate average yield percentage
 	const getAverageYield = () => {
 		const activePots = getActivePots();
-		const yieldEnabledPots = activePots.filter(pot => pot.isYieldEnabled && pot.apy);
-		
+		const yieldEnabledPots = activePots.filter(
+			(pot) => pot.isYieldEnabled && pot.apy
+		);
+
 		if (yieldEnabledPots.length === 0) return 0;
-		
-		const totalApy = yieldEnabledPots.reduce((sum, pot) => sum + (pot.apy || 0), 0);
+
+		const totalApy = yieldEnabledPots.reduce(
+			(sum, pot) => sum + (pot.apy || 0),
+			0
+		);
 		return totalApy / yieldEnabledPots.length;
 	};
 
 	// Generate avatar for user
 	const getUserAvatar = (username: string) => {
-		const colors = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4'];
+		const colors = [
+			'#3B82F6',
+			'#8B5CF6',
+			'#EF4444',
+			'#10B981',
+			'#F59E0B',
+			'#06B6D4',
+		];
 		const colorIndex = username.length % colors.length;
 		return {
 			backgroundColor: colors[colorIndex],
-			letter: username.charAt(0).toUpperCase()
+			letter: username.charAt(0).toUpperCase(),
 		};
 	};
 
@@ -1085,17 +1124,31 @@ export default function ActivityScreen() {
 														onPress={() => setShowDatePicker(true)}
 														className='p-3 border border-gray-300 rounded-lg focus:border-red-500 flex-row items-center justify-between'
 													>
-														<Text className={strictDeadline ? 'text-gray-900' : 'text-gray-500'}>
-															{strictDeadline ? strictDeadline.toLocaleDateString() : 'Select deadline date'}
+														<Text
+															className={
+																strictDeadline
+																	? 'text-gray-900'
+																	: 'text-gray-500'
+															}
+														>
+															{strictDeadline
+																? strictDeadline.toLocaleDateString()
+																: 'Select deadline date'}
 														</Text>
-														<Ionicons name="calendar" size={20} color="#6B7280" />
+														<Ionicons
+															name='calendar'
+															size={20}
+															color='#6B7280'
+														/>
 													</TouchableOpacity>
-													
+
 													{showDatePicker && (
 														<DateTimePicker
 															value={strictDeadline || new Date()}
-															mode="date"
-															display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+															mode='date'
+															display={
+																Platform.OS === 'ios' ? 'spinner' : 'default'
+															}
 															onChange={handleDateChange}
 															minimumDate={new Date()}
 														/>
@@ -1145,11 +1198,14 @@ export default function ActivityScreen() {
 															/>
 															{isSearching && (
 																<View className='absolute right-3 top-3'>
-																	<ActivityIndicator size="small" color="#3B82F6" />
+																	<ActivityIndicator
+																		size='small'
+																		color='#3B82F6'
+																	/>
 																</View>
 															)}
 														</View>
-														
+
 														{/* Search Results */}
 														{searchResults.length > 0 && (
 															<View className='mb-2 border border-gray-200 rounded-lg bg-white'>
@@ -1167,7 +1223,11 @@ export default function ActivityScreen() {
 																				{user.full_name}
 																			</Text>
 																		</View>
-																		<Ionicons name='add-circle' size={20} color='#3B82F6' />
+																		<Ionicons
+																			name='add-circle'
+																			size={20}
+																			color='#3B82F6'
+																		/>
 																	</TouchableOpacity>
 																))}
 															</View>
@@ -1194,7 +1254,9 @@ export default function ActivityScreen() {
 																		</Text>
 																	</View>
 																	<TouchableOpacity
-																		onPress={() => handleRemoveUserFromPot(user.id)}
+																		onPress={() =>
+																			handleRemoveUserFromPot(user.id)
+																		}
 																		className='p-1'
 																	>
 																		<Ionicons
@@ -1278,7 +1340,6 @@ export default function ActivityScreen() {
 				</View>
 			</Modal>
 
-
 			{/* Pot Detail Modal */}
 			<Modal
 				visible={showPotDetailModal}
@@ -1344,7 +1405,7 @@ export default function ActivityScreen() {
 													)}
 												</View>
 											</View>
-											
+
 											{/* Progress */}
 											<View className='mb-3'>
 												<View className='h-2 overflow-hidden bg-gray-200 rounded-full'>
@@ -1357,7 +1418,7 @@ export default function ActivityScreen() {
 													/>
 												</View>
 											</View>
-											
+
 											<View className='flex-row items-center justify-between'>
 												<View>
 													<Text className='text-lg font-bold text-gray-900'>
@@ -1368,7 +1429,8 @@ export default function ActivityScreen() {
 													</Text>
 												</View>
 												<Text className='text-sm font-medium text-gray-700'>
-													{getProgressPercentage(selectedPot.id).toFixed(1)}% complete
+													{getProgressPercentage(selectedPot.id).toFixed(1)}%
+													complete
 												</Text>
 											</View>
 										</View>
@@ -1379,7 +1441,7 @@ export default function ActivityScreen() {
 										<Text className='mb-3 text-lg font-semibold text-gray-900'>
 											Details
 										</Text>
-										
+
 										{/* Status Badges */}
 										<View className='flex-row flex-wrap gap-2 mb-4'>
 											{globalAutoInvestEnabled && (
@@ -1389,7 +1451,7 @@ export default function ActivityScreen() {
 													</Text>
 												</View>
 											)}
-											
+
 											{selectedPot?.isYieldEnabled && selectedPot?.apy && (
 												<View className='px-3 py-1 bg-green-100 rounded-full'>
 													<Text className='text-sm font-medium text-green-600'>
@@ -1419,9 +1481,14 @@ export default function ActivityScreen() {
 										{selectedPot?.isStrict && selectedPot?.strictDeadline && (
 											<View className='p-3 mb-4 border border-red-200 bg-red-50 rounded-lg'>
 												<View className='flex-row items-center'>
-													<Ionicons name='lock-closed' size={16} color='#EF4444' />
+													<Ionicons
+														name='lock-closed'
+														size={16}
+														color='#EF4444'
+													/>
 													<Text className='ml-2 text-sm font-medium text-red-800'>
-														Locked until {selectedPot.strictDeadline.toLocaleDateString()}
+														Locked until{' '}
+														{selectedPot.strictDeadline.toLocaleDateString()}
 													</Text>
 												</View>
 												<Text className='mt-1 text-xs text-red-700'>
@@ -1430,91 +1497,138 @@ export default function ActivityScreen() {
 											</View>
 										)}
 
-									{/* People Section */}
-									<View className='mb-6'>
-										<View className='flex-row items-center mb-3'>
-											<Ionicons name='people' size={16} color='#3B82F6' />
-											<Text className='ml-2 text-lg font-semibold text-gray-900'>
-												People ({(selectedPot?.collaborators?.length || 0) + 1})
-											</Text>
-										</View>
-										
-										{/* Creator */}
-										<View className='mb-3'>
-											<View className='flex-row items-center p-3 border border-gray-200 bg-white rounded-lg'>
-												<View 
-													className='w-10 h-10 rounded-full items-center justify-center mr-3'
-													style={{ backgroundColor: getUserAvatar(walletAddress || 'you').backgroundColor }}
-												>
-													<Text className='text-white font-semibold'>
-														{getUserAvatar(walletAddress || 'you').letter}
-													</Text>
-												</View>
-												<View className='flex-1'>
-													<Text className='font-medium text-gray-900'>You (Creator)</Text>
-													<Text className='text-sm text-gray-600'>@{walletAddress?.slice(0, 8) || 'current_user'}</Text>
-												</View>
-												<View className='px-2 py-1 bg-blue-100 rounded-full'>
-													<Text className='text-xs font-medium text-blue-600'>Owner</Text>
+										{/* People Section */}
+										<View className='mb-6'>
+											<View className='flex-row items-center mb-3'>
+												<Ionicons name='people' size={16} color='#3B82F6' />
+												<Text className='ml-2 text-lg font-semibold text-gray-900'>
+													People (
+													{(selectedPot?.collaborators?.length || 0) + 1})
+												</Text>
+											</View>
+
+											{/* Creator */}
+											<View className='mb-3'>
+												<View className='flex-row items-center p-3 border border-gray-200 bg-white rounded-lg'>
+													<View
+														className='w-10 h-10 rounded-full items-center justify-center mr-3'
+														style={{
+															backgroundColor: getUserAvatar(
+																walletAddress || 'you'
+															).backgroundColor,
+														}}
+													>
+														<Text className='text-white font-semibold'>
+															{getUserAvatar(walletAddress || 'you').letter}
+														</Text>
+													</View>
+													<View className='flex-1'>
+														<Text className='font-medium text-gray-900'>
+															You (Creator)
+														</Text>
+														<Text className='text-sm text-gray-600'>
+															@{walletAddress?.slice(0, 8) || 'current_user'}
+														</Text>
+													</View>
+													<View className='px-2 py-1 bg-blue-100 rounded-full'>
+														<Text className='text-xs font-medium text-blue-600'>
+															Owner
+														</Text>
+													</View>
 												</View>
 											</View>
-										</View>
 
-										{/* Joint Pot Collaborators */}
-										{selectedPot?.isJoint && (
-											<>
-												{selectedPot.collaborators && selectedPot.collaborators.length > 0 && (
-													<View className='mb-3'>
-														<Text className='text-sm font-medium text-gray-700 mb-2'>Collaborators</Text>
-														{selectedPot.collaborators.map((collaborator, index) => (
-															<View key={index} className='flex-row items-center p-3 mb-2 border border-gray-200 bg-white rounded-lg'>
-																<View 
-																	className='w-10 h-10 rounded-full items-center justify-center mr-3'
-																	style={{ backgroundColor: getUserAvatar(collaborator).backgroundColor }}
-																>
-																	<Text className='text-white font-semibold'>
-																		{getUserAvatar(collaborator).letter}
-																	</Text>
-																</View>
-																<View className='flex-1'>
-																	<Text className='font-medium text-gray-900'>@{collaborator}</Text>
-																	<Text className='text-sm text-gray-600'>Collaborator</Text>
-																</View>
-																<View className='px-2 py-1 bg-green-100 rounded-full'>
-																	<Text className='text-xs font-medium text-green-600'>Active</Text>
-																</View>
+											{/* Joint Pot Collaborators */}
+											{selectedPot?.isJoint && (
+												<>
+													{selectedPot.collaborators &&
+														selectedPot.collaborators.length > 0 && (
+															<View className='mb-3'>
+																<Text className='text-sm font-medium text-gray-700 mb-2'>
+																	Collaborators
+																</Text>
+																{selectedPot.collaborators.map(
+																	(collaborator, index) => (
+																		<View
+																			key={index}
+																			className='flex-row items-center p-3 mb-2 border border-gray-200 bg-white rounded-lg'
+																		>
+																			<View
+																				className='w-10 h-10 rounded-full items-center justify-center mr-3'
+																				style={{
+																					backgroundColor:
+																						getUserAvatar(collaborator)
+																							.backgroundColor,
+																				}}
+																			>
+																				<Text className='text-white font-semibold'>
+																					{getUserAvatar(collaborator).letter}
+																				</Text>
+																			</View>
+																			<View className='flex-1'>
+																				<Text className='font-medium text-gray-900'>
+																					@{collaborator}
+																				</Text>
+																				<Text className='text-sm text-gray-600'>
+																					Collaborator
+																				</Text>
+																			</View>
+																			<View className='px-2 py-1 bg-green-100 rounded-full'>
+																				<Text className='text-xs font-medium text-green-600'>
+																					Active
+																				</Text>
+																			</View>
+																		</View>
+																	)
+																)}
 															</View>
-														))}
-													</View>
-												)}
-												
-												{selectedPot.invitedUsers && selectedPot.invitedUsers.length > 0 && (
-													<View className='mb-3'>
-														<Text className='text-sm font-medium text-gray-700 mb-2'>Pending Invitations</Text>
-														{selectedPot.invitedUsers.map((invited, index) => (
-															<View key={index} className='flex-row items-center p-3 mb-2 border border-gray-200 bg-gray-50 rounded-lg'>
-																<View 
-																	className='w-10 h-10 rounded-full items-center justify-center mr-3'
-																	style={{ backgroundColor: getUserAvatar(invited).backgroundColor }}
-																>
-																	<Text className='text-white font-semibold'>
-																		{getUserAvatar(invited).letter}
-																	</Text>
-																</View>
-																<View className='flex-1'>
-																	<Text className='font-medium text-gray-900'>@{invited}</Text>
-																	<Text className='text-sm text-gray-600'>Invited</Text>
-																</View>
-																<View className='px-2 py-1 bg-yellow-100 rounded-full'>
-																	<Text className='text-xs font-medium text-yellow-600'>Pending</Text>
-																</View>
+														)}
+
+													{selectedPot.invitedUsers &&
+														selectedPot.invitedUsers.length > 0 && (
+															<View className='mb-3'>
+																<Text className='text-sm font-medium text-gray-700 mb-2'>
+																	Pending Invitations
+																</Text>
+																{selectedPot.invitedUsers.map(
+																	(invited, index) => (
+																		<View
+																			key={index}
+																			className='flex-row items-center p-3 mb-2 border border-gray-200 bg-gray-50 rounded-lg'
+																		>
+																			<View
+																				className='w-10 h-10 rounded-full items-center justify-center mr-3'
+																				style={{
+																					backgroundColor:
+																						getUserAvatar(invited)
+																							.backgroundColor,
+																				}}
+																			>
+																				<Text className='text-white font-semibold'>
+																					{getUserAvatar(invited).letter}
+																				</Text>
+																			</View>
+																			<View className='flex-1'>
+																				<Text className='font-medium text-gray-900'>
+																					@{invited}
+																				</Text>
+																				<Text className='text-sm text-gray-600'>
+																					Invited
+																				</Text>
+																			</View>
+																			<View className='px-2 py-1 bg-yellow-100 rounded-full'>
+																				<Text className='text-xs font-medium text-yellow-600'>
+																					Pending
+																				</Text>
+																			</View>
+																		</View>
+																	)
+																)}
 															</View>
-														))}
-													</View>
-												)}
-											</>
-										)}
-									</View>
+														)}
+												</>
+											)}
+										</View>
 									</View>
 
 									{/* Available Balance */}
@@ -1591,7 +1705,6 @@ export default function ActivityScreen() {
 					</View>
 				</View>
 			</Modal>
-
 		</SafeAreaView>
 	);
 }

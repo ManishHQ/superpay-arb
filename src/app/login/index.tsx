@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Alert } from 'react-native';
+import {
+	View,
+	Text,
+	TouchableOpacity,
+	TextInput,
+	Alert,
+	KeyboardAvoidingView,
+	Platform,
+	ScrollView,
+} from 'react-native';
 import { router } from 'expo-router';
 import { dynamicClient } from '@/lib/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -325,11 +334,22 @@ export default function LoginPage() {
 	};
 
 	return (
-		<View className='justify-center flex-1 p-5 bg-gray-50'>
-			<Text className='mb-10 text-3xl font-bold text-center text-gray-800'>
-				Welcome to SuperPay
-			</Text>
-			{renderContent()}
-		</View>
+		<KeyboardAvoidingView
+			behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+			style={{ flex: 1 }}
+		>
+			<ScrollView
+				contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+				keyboardShouldPersistTaps='handled'
+				showsVerticalScrollIndicator={false}
+			>
+				<View className='justify-center flex-1 p-5 bg-gray-50'>
+					<Text className='mb-10 text-3xl font-bold text-center text-gray-800'>
+						Welcome to SuperPay
+					</Text>
+					{renderContent()}
+				</View>
+			</ScrollView>
+		</KeyboardAvoidingView>
 	);
 }
