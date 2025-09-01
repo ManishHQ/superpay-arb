@@ -258,8 +258,8 @@ export default function SendModal({
 						note: note,
 						transaction_hash: txResult.hash,
 						block_number: txResult.blockNumber,
-						blockchain: 'ethereum',
-						network: 'base-sepolia',
+						blockchain: 'arbitrum',
+						network: 'sepolia',
 						transaction_type: 'transfer',
 						category: selectedCategory,
 						gas_fee: txResult.gasUsed
@@ -431,7 +431,7 @@ export default function SendModal({
 									onPress={() => {
 										if (Platform.OS === 'web') {
 											window.open(
-												`https://testnet.seitrace.com/tx/${transactionHash}?`,
+												`https://sepolia.arbiscan.io/tx/${transactionHash}`,
 												'_blank'
 											);
 										}
@@ -447,7 +447,7 @@ export default function SendModal({
 								</TouchableOpacity>
 								{Platform.OS === 'web' && (
 									<Text className='mt-1 text-xs text-gray-500'>
-										👆 Click to view on SeiTrace
+										👆 Click to view on Arbiscan
 									</Text>
 								)}
 							</View>

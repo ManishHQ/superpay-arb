@@ -333,8 +333,8 @@ export default function PaymentScreen() {
 					note: note.trim() || `Payment to ${paymentData.recipientName}`,
 					transaction_hash: txResult.hash,
 					block_number: txResult.blockNumber || 0,
-					blockchain: 'ethereum',
-					network: 'base-sepolia',
+					blockchain: 'arbitrum',
+					network: 'sepolia',
 					gas_fee: txResult.gasUsed
 						? Number(txResult.gasUsed) * 0.000000001
 						: undefined, // Convert wei to ETH
@@ -1030,7 +1030,7 @@ export default function PaymentScreen() {
 											Network:
 										</Text>
 										<Text className='font-mono text-xs text-gray-800'>
-											Base Sepolia
+											Arbitrum Sepolia
 										</Text>
 									</View>
 								)}

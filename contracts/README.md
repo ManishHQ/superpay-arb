@@ -6,7 +6,7 @@ This directory contains the smart contracts for the SuperPay savings pots system
 
 ### **SavingsPots.sol**
 
-The main contract that manages savings pots on the Ethereum blockchain.
+The main contract that manages savings pots on the Arbitrum blockchain.
 
 **Features:**
 
@@ -65,7 +65,7 @@ function approve(address spender, uint256 amount) external returns (bool)
 
 When blockchain integration is desired:
 
-1. **Deploy contracts** to Ethereum mainnet or testnet
+1. **Deploy contracts** to Arbitrum mainnet or Arbitrum Sepolia testnet
 2. **Update services** to include blockchain operations
 3. **Add wallet connection** requirements
 4. **Implement gas fee handling**
@@ -89,9 +89,9 @@ npx hardhat run scripts/deploy.js --network localhost
 
 ### **Test Networks**
 
+- **Arbitrum Sepolia** - Arbitrum Layer 2 testnet
 - **Sepolia** - Ethereum testnet
 - **Mumbai** - Polygon testnet
-- **Arbitrum Goerli** - Layer 2 testnet
 
 ## 🔒 Security Considerations
 
@@ -140,11 +140,11 @@ npx hardhat run scripts/deploy.js --network localhost
 export PRIVATE_KEY=your_private_key
 export INFURA_URL=your_infura_url
 
-# Deploy to testnet
-npx hardhat run scripts/deploy.js --network sepolia
+# Deploy to Arbitrum Sepolia testnet
+npx hardhat run scripts/deploy.js --network arbitrumSepolia
 
-# Verify contracts on Etherscan
-npx hardhat verify --network sepolia CONTRACT_ADDRESS
+# Verify contracts on Arbiscan
+npx hardhat verify --network arbitrumSepolia CONTRACT_ADDRESS
 ```
 
 ## 📖 Documentation

@@ -176,14 +176,14 @@ Traditional banking is slow, expensive, and disconnected. Business payments take
 
 ### **🎯 Next 6 Months:**
 
-- **Sei Chain Integration**: Deploy on high-performance blockchain
+- **Arbitrum Sepolia Integration**: Deploy on high-performance Arbitrum L2 testnet
 - **Advanced Analytics**: AI-powered financial insights
 - **Business API**: Third-party integrations and partnerships
 - **Mobile App Stores**: iOS and Android app store launches
 
 ### **🎯 Next 12 Months:**
 
-- **Multi-chain Support**: Ethereum, Polygon, and more
+- **Multi-chain Support**: Arbitrum, Ethereum, Polygon, and more
 - **DeFi Integration**: Yield farming and lending protocols
 - **Social Features**: Community savings and group goals
 - **Enterprise Solutions**: White-label and API access

@@ -65,8 +65,8 @@ CREATE TABLE transactions (
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'cancelled')),
     transaction_hash VARCHAR(66), -- Ethereum tx hashes are 66 chars (0x + 64 hex)
     block_number BIGINT,
-    blockchain VARCHAR(50) DEFAULT 'ethereum',
-    network VARCHAR(50) DEFAULT 'mainnet',
+    blockchain VARCHAR(50) DEFAULT 'arbitrum',
+    network VARCHAR(50) DEFAULT 'sepolia',
     
     -- Fee information
     gas_fee DECIMAL(20, 8),

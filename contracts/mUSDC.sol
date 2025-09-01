@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
  * @title Mock USDC (mUSDC)
  * @dev Mock USDC token contract for testing and development purposes
  * @notice This contract is NOT currently implemented in the main application
- * @notice Use Supabase-based pots system for production use
+ * @notice Use Supabase-based poxqts system for production use
  * @notice This is a test token - NOT real USDC
  */
 contract MockUSDC is ERC20, Ownable, Pausable {

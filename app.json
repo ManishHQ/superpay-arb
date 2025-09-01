@@ -1,39 +1,57 @@
 {
-	"expo": {
-		"name": "react-native-expo",
-		"slug": "react-native-expo",
-		"scheme": "reactnativeexpo",
-		"version": "1.0.0",
-		"orientation": "portrait",
-		"icon": "./assets/icon.png",
-		"userInterfaceStyle": "light",
-		"splash": {
-			"image": "./assets/splash.png",
-			"resizeMode": "contain",
-			"backgroundColor": "#ffffff"
-		},
-		"assetBundlePatterns": ["**/*", "assets/*"],
-		"ios": {
-			"supportsTablet": true,
-			"bundleIdentifier": "com.dynamicinfra.reactnativeexpo"
-		},
-		"android": {
-			"adaptiveIcon": {
-				"foregroundImage": "./assets/adaptive-icon.png",
-				"backgroundColor": "#ffffff"
-			},
-			"package": "com.dynamicinfra.reactnativeexpo"
-		},
-		"web": {
-			"favicon": "./assets/favicon.png",
-			"bundler": "metro",
-			"output": "single"
-		},
-		"extra": {
-			"eas": {
-				"projectId": "165d3eb3-5b25-41a1-a3b2-8cf02e73f818"
-			}
-		},
-		"plugins": ["expo-secure-store", "expo-router", "expo-barcode-scanner"]
-	}
+  "expo": {
+    "name": "SuperPay",
+    "slug": "superpay",
+    "scheme": "superpay",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*",
+      "assets/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.superpay.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.superpay.app",
+      "versionCode": 1,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
+      "buildToolsVersion": "34.0.0",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4f03e09c-cfda-4412-a192-71897b9f7ef0"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-router",
+      "expo-barcode-scanner"
+    ],
+    "owner": "0xbeyond"
+  }
 }

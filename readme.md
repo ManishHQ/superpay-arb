@@ -58,7 +58,7 @@ A modern, feature-rich financial management application built with React Native 
 - **Dynamic Wallets** - Multi-wallet support
 - **QR Code Generation** - Payment request system
 - **Transaction Monitoring** - Payment status tracking
-- **Smart Contracts** - Ethereum-based savings pots (available but not implemented)
+- **Smart Contracts** - Arbitrum-based savings pots (available but not implemented)
 
 ### **State Management**
 
@@ -87,7 +87,7 @@ react-native-expo/
 │   ├── hooks/                  # Custom React hooks
 │   ├── types/                  # TypeScript type definitions
 │   └── lib/                    # Configuration and utilities
-├── contracts/                  # Smart contracts (Ethereum)
+├── contracts/                  # Smart contracts (Arbitrum)
 │   ├── SavingsPots.sol        # Main savings pots contract
 │   ├── mUSDC.sol              # Mock USDC token contract
 │   └── README.md              # Contract documentation
