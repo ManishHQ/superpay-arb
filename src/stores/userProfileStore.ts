@@ -116,17 +116,8 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
       }
       
       // Server is working but user doesn't exist - trigger onboarding
-      // Only create profile if we have complete data from onboarding
-      if (dynamicUserData?.fullName || (dynamicUserData?.firstName && dynamicUserData?.lastName)) {
-        profile = await UserProfileService.getOrCreateProfileForWallet(
-          walletAddress,
-          dynamicUserData
-        );
-        set({ currentProfile: profile, isLoading: false });
-      } else {
-        // Need onboarding - set profile as null to trigger onboarding flow
-        set({ currentProfile: null, isLoading: false, error: 'onboarding_required' });
-      }
+      // DO NOT create profile automatically - let onboarding handle it
+      set({ currentProfile: null, isLoading: false, error: 'onboarding_required' });
     } catch (error: any) {
       console.error('Error creating/updating profile for wallet:', error);
       

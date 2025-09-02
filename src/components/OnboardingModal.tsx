@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AuthService, OnboardingData } from '@/services/authService';
 import { AvatarService } from '@/services/avatarService';
+import { router } from 'expo-router';
 
 interface OnboardingModalProps {
 	visible: boolean;
@@ -212,6 +213,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 			} as OnboardingData;
 
 			const profile = await AuthService.createUserProfile(profileData);
+			console.log('profile', profile);
 
 			if (profile) {
 				Alert.alert('Welcome!', 'Your profile has been created successfully.', [

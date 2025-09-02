@@ -186,8 +186,21 @@ export class UserProfileService {
 
 
   /**
+   * Get profile for wallet address (READ ONLY - no auto-creation)
+   * Use this instead of getOrCreateProfileForWallet to ensure proper onboarding flow
+   */
+  static async getProfileForWallet(walletAddress: string): Promise<UserProfile | null> {
+    try {
+      return await this.getProfileByWalletAddress(walletAddress);
+    } catch (error) {
+      console.error('Error getting profile for wallet:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get or create profile for wallet address
-   * This is useful for Dynamic wallet integration
+   * This is useful for Dynamic wallet integration - BUT ONLY USE AFTER ONBOARDING
    */
   static async getOrCreateProfileForWallet(
     walletAddress: string,
@@ -207,19 +220,12 @@ export class UserProfileService {
         return profile;
       }
 
-      // If no profile exists and we have Dynamic user data, create one
-      if (dynamicUserData) {
-        const username = dynamicUserData.username || 
-                        `user_${walletAddress.slice(-8)}` || 
-                        `user_${Date.now()}`;
-
+      // ONLY create profile if we have COMPLETE user data (post-onboarding)
+      if (dynamicUserData?.fullName && dynamicUserData?.email && dynamicUserData?.username) {
         const profileData: UserProfileInsert = {
-          username,
-          email: dynamicUserData.email || `${username}@wallet.local`,
-          full_name: dynamicUserData.fullName || 
-                    (dynamicUserData.firstName && dynamicUserData.lastName 
-                      ? `${dynamicUserData.firstName} ${dynamicUserData.lastName}`
-                      : dynamicUserData.firstName || dynamicUserData.lastName || username),
+          username: dynamicUserData.username,
+          email: dynamicUserData.email,
+          full_name: dynamicUserData.fullName,
           wallet_address: walletAddress,
           role: 'person',
         };

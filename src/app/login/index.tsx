@@ -18,7 +18,7 @@ export default function LoginPage() {
 	// All hooks must be called before any conditional returns
 	useEffect(() => {
 		if (auth.token && sdk.loaded) {
-			router.replace('/home');
+			router.replace('/');
 		}
 	}, [auth.token, sdk.loaded]);
 
@@ -37,7 +37,7 @@ export default function LoginPage() {
 		try {
 			await AsyncStorage.setItem('authToken', token);
 			console.log('Auth token stored successfully');
-			router.replace('/home');
+			router.replace('/');
 		} catch (error) {
 			console.error('Error storing auth token:', error);
 		}
@@ -139,7 +139,7 @@ export default function LoginPage() {
 					Alert.alert('Success', 'Email verified successfully!', [
 						{
 							text: 'Continue',
-							onPress: () => router.replace('/home'),
+							onPress: () => router.replace('/'),
 						},
 					]);
 				})
@@ -164,7 +164,7 @@ export default function LoginPage() {
 					Alert.alert('Success', 'Phone verified successfully!', [
 						{
 							text: 'Continue',
-							onPress: () => router.replace('/home'),
+							onPress: () => router.replace('/'),
 						},
 					]);
 				})
