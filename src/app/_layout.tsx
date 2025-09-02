@@ -1,11 +1,16 @@
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
 import { client } from '@/lib/client';
+import '../global.css';
 
 export default function AppLayout() {
 	return (
 		<>
 			<client.reactNative.WebView />
-			<Slot />
+			<Stack>
+				<Stack.Screen name='index' />
+				<Stack.Screen name='login/index' />
+				<Stack.Screen name='(tabs)/home/index' />
+			</Stack>
 		</>
 	);
 }

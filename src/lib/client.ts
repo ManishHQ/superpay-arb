@@ -21,5 +21,4 @@ export const client = createClient({
 	.extend(ReactNativeExtension())
 	.extend(ViemExtension())
 	.extend(ZeroDevExtension())
-	// @ts-ignore
 	.extend(WebExtension());

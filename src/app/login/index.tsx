@@ -1,20 +1,41 @@
-import { FC, useState } from 'react';
+import { useState } from 'react';
 import { InputField } from '@/InputField/InputField';
 import { client } from '@/lib/client';
 import { Button, StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
+import { useReactiveClient } from '@dynamic-labs/react-hooks';
 
-export const LoginView: FC = () => {
+export default function LoginPage() {
 	const [usedOneTimePasswordMethod, setUsedOneTimePasswordMethod] = useState<
 		'email' | 'sms' | null
 	>(null);
+	const { auth } = useReactiveClient(client);
+
+	if (auth.token) {
+		router.push('/home');
+	}
 
 	const renderContent = () => {
 		if (usedOneTimePasswordMethod !== null) {
 			const onSubmit = (token: string) => {
 				if (usedOneTimePasswordMethod === 'email') {
-					client.auth.email.verifyOTP(token);
+					client.auth.email
+						.verifyOTP(token)
+						.then(() => {
+							router.push('/home');
+						})
+						.catch((error) => {
+							console.error(error);
+						});
 				} else if (usedOneTimePasswordMethod === 'sms') {
-					client.auth.sms.verifyOTP(token);
+					client.auth.sms
+						.verifyOTP(token)
+						.then(() => {
+							router.push('/home');
+						})
+						.catch((error) => {
+							console.error(error);
+						});
 				}
 			};
 
@@ -66,7 +87,7 @@ export const LoginView: FC = () => {
 	};
 
 	return <View style={styles.container}>{renderContent()}</View>;
-};
+}
 
 const styles = StyleSheet.create({
 	container: {
