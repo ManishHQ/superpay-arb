@@ -58,6 +58,7 @@ A modern, feature-rich financial management application built with React Native 
 - **Dynamic Wallets** - Multi-wallet support
 - **QR Code Generation** - Payment request system
 - **Transaction Monitoring** - Payment status tracking
+- **Smart Contracts** - Ethereum-based savings pots (available but not implemented)
 
 ### **State Management**
 
@@ -86,6 +87,10 @@ react-native-expo/
 │   ├── hooks/                  # Custom React hooks
 │   ├── types/                  # TypeScript type definitions
 │   └── lib/                    # Configuration and utilities
+├── contracts/                  # Smart contracts (Ethereum)
+│   ├── SavingsPots.sol        # Main savings pots contract
+│   ├── mUSDC.sol              # Mock USDC token contract
+│   └── README.md              # Contract documentation
 ├── supabase/                   # Database migrations and config
 ├── assets/                     # Images, icons, and static files
 └── docs/                       # Documentation and guides
@@ -155,6 +160,28 @@ react-native-expo/
 - **Real-time Updates** - Live data synchronization
 - **Audit Trails** - Complete transaction history
 - **Scalable Design** - Optimized for high user volumes
+
+## ⛓️ Smart Contracts
+
+### **Available Contracts (Not Currently Implemented)**
+
+The project includes smart contracts for future blockchain integration:
+
+- **`SavingsPots.sol`** - Main contract for on-chain savings pots
+- **`mUSDC.sol`** - Mock USDC token for testing and development
+
+### **Contract Features**
+
+- **Savings Pot Management** - Create, fund, and withdraw from blockchain-based pots
+- **USDC Integration** - Native stablecoin support for all transactions
+- **Multi-User Support** - Collaborative savings with on-chain verification
+- **Yield Farming** - DeFi protocol integration for earning interest
+
+### **Implementation Status**
+
+- **Current Version**: Supabase-only pots system (recommended for production)
+- **Future Version**: Optional blockchain integration for advanced users
+- **Migration Path**: Seamless upgrade from database to blockchain pots
 
 ## 🔧 Configuration
 
