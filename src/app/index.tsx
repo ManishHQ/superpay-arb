@@ -1,6 +1,7 @@
 import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { SplashScreen } from '@/components/SplashScreen';
 
 export default function Home() {
 	const router = useRouter();
@@ -11,10 +12,14 @@ export default function Home() {
 		const timer = setTimeout(() => {
 			setIsReady(true);
 			router.push('/login');
-		}, 100);
+		}, 3000);
 
 		return () => clearTimeout(timer);
 	}, [router]);
+
+	if (!isReady) {
+		return <SplashScreen onAnimationComplete={() => setIsReady(true)} />;
+	}
 
 	return (
 		<View className='items-center justify-center flex-1 bg-white'>

@@ -6,7 +6,6 @@ import {
 	Alert,
 	Modal,
 	TextInput,
-	ScrollView,
 	ActivityIndicator,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -80,7 +79,7 @@ export default function PaymentScreen() {
 		setShowPaymentModal(true);
 	};
 
-	const handlePayment = async () => {
+	const handlePayment = async (text: string) => {
 		if (!amount || parseFloat(amount) <= 0) {
 			Alert.alert('Error', 'Please enter a valid amount');
 			return;
@@ -118,17 +117,7 @@ export default function PaymentScreen() {
 
 	return (
 		<View className='relative items-center justify-center flex-1 bg-white'>
-			{/* Balance Header */}
-			<View className='absolute z-10 top-12 left-4 right-4'>
-				<View className='p-3 border border-gray-200 rounded-lg bg-white/90 backdrop-blur'>
-					<Text className='mb-1 text-xs text-gray-500'>Your Balance</Text>
-					<Text className='text-lg font-bold text-gray-800'>
-						{mockBalance} USDC
-					</Text>
-				</View>
-			</View>
-
-			{!scanResult && (
+			{!scanResult && mode === 'scan' && (
 				<CameraView
 					barcodeScannerSettings={{
 						barcodeTypes: ['qr', 'code128'],
@@ -166,7 +155,7 @@ export default function PaymentScreen() {
 			)}
 
 			{/* Mode Toggle */}
-			<View className='flex-row w-full max-w-xs p-1 mx-auto mt-32 mb-8 bg-gray-100 rounded-full'>
+			<View className='absolute z-10 flex-row w-full max-w-xs p-1 mx-auto mb-8 bg-gray-100 rounded-full top-20'>
 				<TouchableOpacity
 					className={`flex-1 items-center py-3 rounded-full ${
 						mode === 'scan' ? 'bg-blue-600' : ''
@@ -203,78 +192,92 @@ export default function PaymentScreen() {
 
 			{/* Main Content */}
 			{mode === 'scan' ? (
-				<View className='items-center justify-center flex-1 w-full'>
+				<View className='items-center justify-center flex-1 w-full '>
 					<Text className='mb-6 text-2xl font-bold text-white'>
 						Scan to Pay
 					</Text>
-					<View className='relative items-center justify-center mb-6 overflow-hidden w-72 h-72'>
+
+					{/* Opaque Background */}
+					<View className='absolute inset-0 bg-black/20' />
+
+					{/* Centered Border Box - Clear/Transparent */}
+					<View className='relative items-center justify-center mb-6 w-80 h-80'>
+						{/* Clear/Transparent Center */}
+						<View className='absolute inset-0 bg-transparent rounded-2xl' />
+
+						{/* Dashed Border Box */}
 						<View
 							pointerEvents='none'
 							style={{
 								position: 'absolute',
-								top: 0,
-								left: 0,
-								width: '100%',
-								height: '100%',
+								top: '50%',
+								left: '50%',
+								width: 280,
+								height: 280,
+								marginTop: -140,
+								marginLeft: -140,
 								borderWidth: 4,
 								borderRadius: 16,
 								borderStyle: 'dashed',
-								borderColor: '#4F46E5',
+								borderColor: '#FFFFFF',
+								backgroundColor: 'transparent',
 							}}
 						/>
 					</View>
-					<Text className='z-20 text-base text-gray-400'>
-						Point your camera at a QR code to pay or request
+
+					<Text className='z-20 text-base text-white'>
+						Point your camera at a QR code to pay
 					</Text>
 				</View>
 			) : (
-				<ScrollView
-					className='flex-1 w-full'
-					contentContainerStyle={{
-						alignItems: 'center',
-						justifyContent: 'center',
-						paddingVertical: 20,
-					}}
-				>
-					<Text className='mb-6 text-2xl font-bold text-gray-800'>
-						My QR Code
-					</Text>
+				<View className='flex-1 w-full bg-white'>
+					<View className='items-center justify-center flex-1 px-6'>
+						<Text className='mb-8 text-3xl font-bold text-gray-800'>
+							My QR Code
+						</Text>
 
-					{/* QR Code Display */}
-					<View className='items-center justify-center mb-6 bg-white border-2 border-gray-200 shadow-lg w-72 h-72 rounded-2xl'>
-						<Ionicons name='qr-code' size={120} color='#4F46E5' />
-						<Text className='mt-2 text-gray-500'>Your QR Code</Text>
+						{/* QR Code Display */}
+						<View className='items-center justify-center mb-8 bg-white border-2 border-gray-200 shadow-xl w-80 h-80 rounded-3xl'>
+							<Ionicons name='qr-code' size={140} color='#4F46E5' />
+							<Text className='mt-4 text-lg font-medium text-gray-600'>
+								Your QR Code
+							</Text>
+						</View>
+
+						{/* Action Buttons - Better Design & Alignment */}
+						<View className='w-full max-w-sm mb-8 space-y-4'>
+							<TouchableOpacity
+								className='w-full py-4 bg-blue-600 shadow-lg rounded-2xl'
+								onPress={() => setShowRequestModal(true)}
+								activeOpacity={0.8}
+							>
+								<View className='flex-row items-center justify-center'>
+									<Ionicons name='receipt' size={22} color='white' />
+									<Text className='ml-3 text-lg font-semibold text-white'>
+										Request Amount
+									</Text>
+								</View>
+							</TouchableOpacity>
+
+							<TouchableOpacity
+								className='w-full py-4 shadow-lg bg-gradient-to-r from-gray-500 to-gray-600 rounded-2xl'
+								onPress={() => console.log('Reset QR')}
+								activeOpacity={0.8}
+							>
+								<View className='flex-row items-center justify-center'>
+									<Ionicons name='refresh' size={22} color='gray-900' />
+									<Text className='ml-3 text-lg font-semibold text-gray-900'>
+										Reset QR
+									</Text>
+								</View>
+							</TouchableOpacity>
+						</View>
+
+						<Text className='max-w-sm text-base leading-6 text-center text-gray-500'>
+							Let others scan this QR code to pay you any amount
+						</Text>
 					</View>
-
-					{/* Action Buttons */}
-					<View className='flex-row mb-4 space-x-4'>
-						<TouchableOpacity
-							className='flex-1 px-6 py-3 bg-blue-600 rounded-lg'
-							onPress={() => setShowRequestModal(true)}
-						>
-							<View className='flex-row items-center justify-center'>
-								<Ionicons name='receipt' size={20} color='white' />
-								<Text className='ml-2 font-semibold text-white'>
-									Request Amount
-								</Text>
-							</View>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							className='flex-1 px-6 py-3 bg-gray-600 rounded-lg'
-							onPress={() => console.log('Reset QR')}
-						>
-							<View className='flex-row items-center justify-center'>
-								<Ionicons name='refresh' size={20} color='white' />
-								<Text className='ml-2 font-semibold text-white'>Reset QR</Text>
-							</View>
-						</TouchableOpacity>
-					</View>
-
-					<Text className='max-w-xs text-base text-center text-gray-500'>
-						Let others scan this to pay you any amount
-					</Text>
-				</ScrollView>
+				</View>
 			)}
 
 			{/* Payment Modal */}
@@ -301,18 +304,26 @@ export default function PaymentScreen() {
 						<Text className='mb-2 text-sm font-medium text-gray-700'>
 							Amount (USDC)
 						</Text>
-						<View className='flex-row items-center px-3 py-2 border border-gray-300 rounded-lg'>
-							<Text className='mr-2 text-lg font-bold text-blue-600'>USDC</Text>
+						<View className='flex-row items-center px-4 py-4 border border-gray-300 rounded-xl bg-gray-50'>
+							<Text className='mr-3 text-2xl font-bold leading-8 text-blue-600'>
+								USDC
+							</Text>
 							<TextInput
 								placeholder='0.00'
 								value={amount}
 								onChangeText={setAmount}
 								keyboardType='decimal-pad'
-								className='flex-1 text-lg'
+								className='flex-1 text-2xl font-semibold text-gray-800'
 								placeholderTextColor='#9CA3AF'
+								style={{
+									textAlignVertical: 'center',
+									includeFontPadding: false,
+									lineHeight: 32,
+									paddingVertical: 0,
+								}}
 							/>
 						</View>
-						<Text className='mt-1 text-xs text-gray-500'>
+						<Text className='mt-2 text-sm text-gray-500'>
 							Available: {mockBalance} USDC
 						</Text>
 					</View>
@@ -322,14 +333,18 @@ export default function PaymentScreen() {
 							Note (Optional)
 						</Text>
 						<TextInput
-							placeholder='Add a note...'
+							placeholder='What is this request for?'
 							value={note}
 							onChangeText={setNote}
 							multiline
 							numberOfLines={3}
-							className='px-3 py-2 text-base border border-gray-300 rounded-lg'
+							className='px-4 py-3 text-base bg-white border border-gray-300 rounded-lg'
 							placeholderTextColor='#9CA3AF'
-							textAlignVertical='top'
+							style={{
+								minHeight: 80,
+								textAlignVertical: 'top',
+								includeFontPadding: false,
+							}}
 						/>
 					</View>
 
@@ -337,7 +352,7 @@ export default function PaymentScreen() {
 						className={`p-4 rounded-lg ${
 							amount && !isProcessing ? 'bg-green-600' : 'bg-gray-400'
 						}`}
-						onPress={handlePayment}
+						onPress={() => handlePayment(note)}
 						disabled={!amount || isProcessing}
 					>
 						{isProcessing ? (
@@ -386,15 +401,23 @@ export default function PaymentScreen() {
 						<Text className='mb-2 text-sm font-medium text-gray-700'>
 							Request Amount (USDC)
 						</Text>
-						<View className='flex-row items-center px-3 py-2 border border-gray-300 rounded-lg'>
-							<Text className='mr-2 text-lg font-bold text-blue-600'>USDC</Text>
+						<View className='flex-row items-center px-4 py-4 border border-gray-300 rounded-xl bg-gray-50'>
+							<Text className='mr-3 text-2xl font-bold leading-8 text-green-600'>
+								$
+							</Text>
 							<TextInput
 								placeholder='0.00'
 								value={requestAmount}
 								onChangeText={setRequestAmount}
 								keyboardType='decimal-pad'
-								className='flex-1 text-lg'
+								className='flex-1 text-2xl font-semibold text-gray-800'
 								placeholderTextColor='#9CA3AF'
+								style={{
+									textAlignVertical: 'center',
+									includeFontPadding: false,
+									lineHeight: 25,
+									paddingVertical: 0,
+								}}
 							/>
 						</View>
 					</View>
@@ -409,9 +432,13 @@ export default function PaymentScreen() {
 							onChangeText={setRequestNote}
 							multiline
 							numberOfLines={3}
-							className='px-3 py-2 text-base border border-gray-300 rounded-lg'
+							className='px-4 py-3 text-base bg-white border border-gray-300 rounded-lg'
 							placeholderTextColor='#9CA3AF'
-							textAlignVertical='top'
+							style={{
+								minHeight: 80,
+								textAlignVertical: 'top',
+								includeFontPadding: false,
+							}}
 						/>
 					</View>
 
