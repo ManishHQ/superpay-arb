@@ -1,4 +1,4 @@
-# SuperPay - React Native Expo App
+# SuperPay - Payments and Loyalties
 
 A modern, feature-rich financial management application built with React Native and Expo, featuring a comprehensive savings pots system powered by Supabase.
 
