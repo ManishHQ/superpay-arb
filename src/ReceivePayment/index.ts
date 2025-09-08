@@ -1,0 +1,1 @@
+export { ReceivePayment } from './ReceivePayment';

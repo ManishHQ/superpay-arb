@@ -1,0 +1,1 @@
+export { DemoNotice } from './DemoNotice';
